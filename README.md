@@ -28,7 +28,7 @@ This is an experiment to see how far I can take the performance of a full fledge
 ## Limitations
 
 - 8 decimal places due to decimal library used. This should be fine for most use cases.
-- Consider [LMAX Disruptor](https://lmax-exchange.github.io/disruptor/) to maintain the throughput with a matching engine, although this level of thoughput is probably not necessary for most use cases.
+- Consider [LMAX Disruptor](https://lmax-exchange.github.io/disruptor/) to maintain the throughput while post-processing with a matching engine, although this level of thoughput is probably not necessary for most use cases.
 
 ## How do I use this?
 
