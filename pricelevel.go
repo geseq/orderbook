@@ -4,11 +4,11 @@ import (
 	decimal "github.com/geseq/udecimal"
 )
 
-//go:generate gotemplate "github.com/geseq/redblacktree" Tree(udecimal.Decimal,*OrderQueue)
+//go:generate gotemplate "github.com/geseq/redblacktree" tree(udecimal.Decimal,*orderQueue)
 
-// PriceLevel implements facade to operations with order queue
-type PriceLevel struct {
-	priceTree *Tree
+// priceLevel implements facade to operations with order queue
+type priceLevel struct {
+	priceTree *tree
 	priceType PriceType
 
 	volume    decimal.Decimal
@@ -35,37 +35,37 @@ const (
 	StopPrice
 )
 
-// NewPriceLevel creates new PriceLevel manager
-func NewPriceLevel(priceType PriceType) *PriceLevel {
-	return &PriceLevel{
-		priceTree: NewWithTree(Comparator),
+// newPriceLevel creates new priceLevel manager
+func newPriceLevel(priceType PriceType) *priceLevel {
+	return &priceLevel{
+		priceTree: newWithTree(Comparator),
 		priceType: priceType,
 		volume:    decimal.Zero,
 	}
 }
 
 // Len returns amount of orders
-func (pl *PriceLevel) Len() uint64 {
+func (pl *priceLevel) Len() uint64 {
 	return pl.numOrders
 }
 
 // Depth returns depth of market
-func (pl *PriceLevel) Depth() int {
+func (pl *priceLevel) Depth() int {
 	return pl.depth
 }
 
 // Volume returns total amount of quantity in side
-func (pl *PriceLevel) Volume() decimal.Decimal {
+func (pl *priceLevel) Volume() decimal.Decimal {
 	return pl.volume
 }
 
 // Append appends order to definite price level
-func (pl *PriceLevel) Append(o *Order) *Order {
+func (pl *priceLevel) Append(o *Order) *Order {
 	price := o.GetPrice(pl.priceType)
 
 	priceQueue, ok := pl.priceTree.Get(price)
 	if !ok {
-		priceQueue = NewOrderQueue(price)
+		priceQueue = newOrderQueue(price)
 		pl.priceTree.Put(price, priceQueue)
 		pl.depth++
 	}
@@ -75,7 +75,7 @@ func (pl *PriceLevel) Append(o *Order) *Order {
 }
 
 // Remove removes order from definite price level
-func (pl *PriceLevel) Remove(o *Order) *Order {
+func (pl *priceLevel) Remove(o *Order) *Order {
 	price := o.GetPrice(pl.priceType)
 
 	priceQueue, ok := pl.priceTree.Get(price)
@@ -95,7 +95,7 @@ func (pl *PriceLevel) Remove(o *Order) *Order {
 }
 
 // MaxPriceQueue returns maximal level of price
-func (pl *PriceLevel) MaxPriceQueue() *OrderQueue {
+func (pl *priceLevel) MaxPriceQueue() *orderQueue {
 	if pl.depth > 0 {
 		if value, found := pl.priceTree.GetMax(); found {
 			return value.Value
@@ -105,7 +105,7 @@ func (pl *PriceLevel) MaxPriceQueue() *OrderQueue {
 }
 
 // MinPriceQueue returns maximal level of price
-func (pl *PriceLevel) MinPriceQueue() *OrderQueue {
+func (pl *priceLevel) MinPriceQueue() *orderQueue {
 	if pl.depth > 0 {
 		if value, found := pl.priceTree.GetMin(); found {
 			return value.Value
@@ -114,8 +114,8 @@ func (pl *PriceLevel) MinPriceQueue() *OrderQueue {
 	return nil
 }
 
-// LargestLessThan returns largest OrderQueue with price less than given
-func (pl *PriceLevel) LargestLessThan(price decimal.Decimal) *OrderQueue {
+// LargestLessThan returns largest orderQueue with price less than given
+func (pl *priceLevel) LargestLessThan(price decimal.Decimal) *orderQueue {
 	if node, ok := pl.priceTree.LargestLessThan(price); ok {
 		return node.Value
 	}
@@ -123,8 +123,8 @@ func (pl *PriceLevel) LargestLessThan(price decimal.Decimal) *OrderQueue {
 	return nil
 }
 
-// SmallestGreaterThan returns smallest OrderQueue with price greater than given
-func (pl *PriceLevel) SmallestGreaterThan(price decimal.Decimal) *OrderQueue {
+// SmallestGreaterThan returns smallest orderQueue with price greater than given
+func (pl *priceLevel) SmallestGreaterThan(price decimal.Decimal) *orderQueue {
 	if node, ok := pl.priceTree.SmallestGreaterThan(price); ok {
 		return node.Value
 	}
@@ -133,7 +133,7 @@ func (pl *PriceLevel) SmallestGreaterThan(price decimal.Decimal) *OrderQueue {
 }
 
 // Orders returns all of * orders
-func (pl *PriceLevel) Orders() (orders []*Order) {
+func (pl *priceLevel) Orders() (orders []*Order) {
 	it := pl.priceTree.Iterator()
 	for i := 0; it.Next(); i++ {
 		iter := it.Value().Head()
@@ -146,7 +146,7 @@ func (pl *PriceLevel) Orders() (orders []*Order) {
 }
 
 // GetQueue returns the max/min order queue by the price type
-func (pl *PriceLevel) GetQueue() *OrderQueue {
+func (pl *priceLevel) GetQueue() *orderQueue {
 	switch pl.priceType {
 	case BidPrice:
 		return pl.MaxPriceQueue()
@@ -158,7 +158,7 @@ func (pl *PriceLevel) GetQueue() *OrderQueue {
 }
 
 // GetNextQueue returns the next level order queue by the price type
-func (pl *PriceLevel) GetNextQueue(price decimal.Decimal) *OrderQueue {
+func (pl *priceLevel) GetNextQueue(price decimal.Decimal) *orderQueue {
 	switch pl.priceType {
 	case BidPrice:
 		return pl.LargestLessThan(price)
@@ -169,9 +169,9 @@ func (pl *PriceLevel) GetNextQueue(price decimal.Decimal) *OrderQueue {
 	}
 }
 
-func (pl *PriceLevel) processMarketOrder(ob *OrderBook, takerOrderID uint64, qty decimal.Decimal, aon, fok bool) (qtyProcessed decimal.Decimal) {
+func (pl *priceLevel) processMarketOrder(ob *OrderBook, takerOrderID uint64, qty decimal.Decimal, aon, fok bool) (qtyProcessed decimal.Decimal) {
 
-	// TODO: This wont work as  PriceLevel volumes aren't accounted for corectly
+	// TODO: This wont work as  priceLevel volumes aren't accounted for corectly
 	if (aon || fok) && qty.GreaterThan(pl.Volume()) {
 		return decimal.Zero
 	}
@@ -187,7 +187,7 @@ func (pl *PriceLevel) processMarketOrder(ob *OrderBook, takerOrderID uint64, qty
 	return
 }
 
-func (pl *PriceLevel) processLimitOrder(ob *OrderBook, compare func(price decimal.Decimal) bool, takerOrderID uint64, qty decimal.Decimal, aon, fok bool) (qtyProcessed decimal.Decimal) {
+func (pl *priceLevel) processLimitOrder(ob *OrderBook, compare func(price decimal.Decimal) bool, takerOrderID uint64, qty decimal.Decimal, aon, fok bool) (qtyProcessed decimal.Decimal) {
 	orderQueue := pl.GetQueue()
 	if orderQueue == nil || !compare(orderQueue.Price()) {
 		return

@@ -49,9 +49,9 @@ type TradeHandler interface {
 
 // OrderBook implements standard matching algorithm
 type OrderBook struct {
-	asks       *PriceLevel
-	bids       *PriceLevel
-	stops      *PriceLevel
+	asks       *priceLevel
+	bids       *priceLevel
+	stops      *priceLevel
 	orders     map[uint64]*Order // orderId -> *Order
 	stopOrders map[uint64]*Order // orderId -> *Order
 
@@ -68,9 +68,9 @@ func NewOrderBook(orderStateHandler OrderStateHandler, tradeHandler TradeHandler
 	return &OrderBook{
 		orders:            map[uint64]*Order{},
 		stopOrders:        map[uint64]*Order{},
-		bids:              NewPriceLevel(BidPrice),
-		asks:              NewPriceLevel(AskPrice),
-		stops:             NewPriceLevel(StopPrice),
+		bids:              newPriceLevel(BidPrice),
+		asks:              newPriceLevel(AskPrice),
+		stops:             newPriceLevel(StopPrice),
 		orderNotification: orderStateHandler,
 		tradeNotification: tradeHandler,
 	}
@@ -244,8 +244,8 @@ func (ob *OrderBook) CalculateMarketPrice(side SideType, quantity decimal.Decima
 	price = decimal.Zero
 
 	var (
-		level *OrderQueue
-		iter  func(decimal.Decimal) *OrderQueue
+		level *orderQueue
+		iter  func(decimal.Decimal) *orderQueue
 	)
 
 	if side == Buy {

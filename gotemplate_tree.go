@@ -22,46 +22,46 @@ import (
 
 type colorTree bool
 
-type ComparatorTree func(a, b udecimal.Decimal) int
+type comparatorTree func(a, b udecimal.Decimal) int
 
 const (
 	blackTree, redTree colorTree = true, false
 )
 
 // Tree holds elements of the red-black tree
-type Tree struct {
-	Root       *NodeTree
+type tree struct {
+	Root       *nodeTree
 	size       int
-	Comparator ComparatorTree
-	Min        *NodeTree
-	Max        *NodeTree
+	Comparator comparatorTree
+	Min        *nodeTree
+	Max        *nodeTree
 }
 
 // template type Tree(KeyType, ValueType)
 
 // Node is a single element within the tree
-type NodeTree struct {
+type nodeTree struct {
 	Key    udecimal.Decimal
-	Value  *OrderQueue
+	Value  *orderQueue
 	color  colorTree
-	Left   *NodeTree
-	Right  *NodeTree
-	Parent *NodeTree
+	Left   *nodeTree
+	Right  *nodeTree
+	Parent *nodeTree
 }
 
 // NewWith instantiates a red-black tree with the custom comparator.
-func NewWithTree(comparator ComparatorTree) *Tree {
-	return &Tree{Comparator: comparator}
+func newWithTree(comparator comparatorTree) *tree {
+	return &tree{Comparator: comparator}
 }
 
 // Put inserts node into the tree.
 // Key should adhere to the comparator's type assertion, otherwise method panics.
-func (tree *Tree) Put(key udecimal.Decimal, value *OrderQueue) {
-	var insertedNode *NodeTree
+func (tree *tree) Put(key udecimal.Decimal, value *orderQueue) {
+	var insertedNode *nodeTree
 	if tree.Root == nil {
 		// Assert key is of comparator's type for initial tree
 		tree.Comparator(key, key)
-		tree.Root = &NodeTree{Key: key, Value: value, color: redTree}
+		tree.Root = &nodeTree{Key: key, Value: value, color: redTree}
 		insertedNode = tree.Root
 		tree.Min = tree.Root
 		tree.Max = tree.Root
@@ -77,7 +77,7 @@ func (tree *Tree) Put(key udecimal.Decimal, value *OrderQueue) {
 				return
 			case compare < 0:
 				if node.Left == nil {
-					node.Left = &NodeTree{Key: key, Value: value, color: redTree}
+					node.Left = &nodeTree{Key: key, Value: value, color: redTree}
 					insertedNode = node.Left
 					loop = false
 				} else {
@@ -85,7 +85,7 @@ func (tree *Tree) Put(key udecimal.Decimal, value *OrderQueue) {
 				}
 			case compare > 0:
 				if node.Right == nil {
-					node.Right = &NodeTree{Key: key, Value: value, color: redTree}
+					node.Right = &nodeTree{Key: key, Value: value, color: redTree}
 					insertedNode = node.Right
 					loop = false
 				} else {
@@ -111,7 +111,7 @@ func (tree *Tree) Put(key udecimal.Decimal, value *OrderQueue) {
 // Get searches the node in the tree by key and returns its value or nil if key is not found in tree.
 // Second return parameter is true if key was found, otherwise false.
 // Key should adhere to the comparator's type assertion, otherwise method panics.
-func (tree *Tree) Get(key udecimal.Decimal) (value *OrderQueue, found bool) {
+func (tree *tree) Get(key udecimal.Decimal) (value *orderQueue, found bool) {
 	node := tree.lookup(key)
 	if node != nil {
 		return node.Value, true
@@ -121,8 +121,8 @@ func (tree *Tree) Get(key udecimal.Decimal) (value *OrderQueue, found bool) {
 
 // Remove remove the node from the tree by key.
 // Key should adhere to the comparator's type assertion, otherwise method panics.
-func (tree *Tree) Remove(key udecimal.Decimal) {
-	var child *NodeTree
+func (tree *tree) Remove(key udecimal.Decimal) {
+	var child *nodeTree
 	node := tree.lookup(key)
 	if node == nil {
 		return
@@ -167,17 +167,17 @@ func (tree *Tree) Remove(key udecimal.Decimal) {
 }
 
 // Empty returns true if tree does not contain any nodes
-func (tree *Tree) Empty() bool {
+func (tree *tree) Empty() bool {
 	return tree.size == 0
 }
 
 // Size returns number of nodes in the tree.
-func (tree *Tree) Size() int {
+func (tree *tree) Size() int {
 	return tree.size
 }
 
 // Keys returns all keys in-order
-func (tree *Tree) Keys() []udecimal.Decimal {
+func (tree *tree) Keys() []udecimal.Decimal {
 	keys := make([]udecimal.Decimal, tree.size)
 	it := tree.Iterator()
 	for i := 0; it.Next(); i++ {
@@ -187,8 +187,8 @@ func (tree *Tree) Keys() []udecimal.Decimal {
 }
 
 // Values returns all values in-order based on the key.
-func (tree *Tree) Values() []*OrderQueue {
-	values := make([]*OrderQueue, tree.size)
+func (tree *tree) Values() []*orderQueue {
+	values := make([]*orderQueue, tree.size)
 	it := tree.Iterator()
 	for i := 0; it.Next(); i++ {
 		values[i] = it.Value()
@@ -197,8 +197,8 @@ func (tree *Tree) Values() []*OrderQueue {
 }
 
 // Left returns the left-most (min) node or nil if tree is empty.
-func (tree *Tree) Left() *NodeTree {
-	var parent *NodeTree
+func (tree *tree) Left() *nodeTree {
+	var parent *nodeTree
 	current := tree.Root
 	for current != nil {
 		parent = current
@@ -208,8 +208,8 @@ func (tree *Tree) Left() *NodeTree {
 }
 
 // Right returns the right-most (max) node or nil if tree is empty.
-func (tree *Tree) Right() *NodeTree {
-	var parent *NodeTree
+func (tree *tree) Right() *nodeTree {
+	var parent *nodeTree
 	current := tree.Root
 	for current != nil {
 		parent = current
@@ -226,7 +226,7 @@ func (tree *Tree) Right() *NodeTree {
 // all nodes in the tree are larger than the given node.
 //
 // Key should adhere to the comparator's type assertion, otherwise method panics.
-func (tree *Tree) Floor(key udecimal.Decimal) (floor *NodeTree, found bool) {
+func (tree *tree) Floor(key udecimal.Decimal) (floor *nodeTree, found bool) {
 	found = false
 	node := tree.Root
 	for node != nil {
@@ -255,7 +255,7 @@ func (tree *Tree) Floor(key udecimal.Decimal) (floor *NodeTree, found bool) {
 // all nodes in the tree are smaller than the given node.
 //
 // Key should adhere to the comparator's type assertion, otherwise method panics.
-func (tree *Tree) Ceiling(key udecimal.Decimal) (ceiling *NodeTree, found bool) {
+func (tree *tree) Ceiling(key udecimal.Decimal) (ceiling *nodeTree, found bool) {
 	found = false
 	node := tree.Root
 	for node != nil {
@@ -281,7 +281,7 @@ func (tree *Tree) Ceiling(key udecimal.Decimal) (ceiling *NodeTree, found bool) 
 // all nodes in the tree are larger than or equal to the given node.
 //
 // Key should adhere to the comparator's type assertion, otherwise method panics.
-func (tree *Tree) LargestLessThan(key udecimal.Decimal) (floor *NodeTree, found bool) {
+func (tree *tree) LargestLessThan(key udecimal.Decimal) (floor *nodeTree, found bool) {
 	found = false
 	node := tree.Root
 	for node != nil {
@@ -303,7 +303,7 @@ func (tree *Tree) LargestLessThan(key udecimal.Decimal) (floor *NodeTree, found 
 // all nodes in the tree are smaller than the given node.
 //
 // Key should adhere to the comparator's type assertion, otherwise method panics.
-func (tree *Tree) SmallestGreaterThan(key udecimal.Decimal) (ceiling *NodeTree, found bool) {
+func (tree *tree) SmallestGreaterThan(key udecimal.Decimal) (ceiling *nodeTree, found bool) {
 	found = false
 	node := tree.Root
 	for node != nil {
@@ -322,16 +322,16 @@ func (tree *Tree) SmallestGreaterThan(key udecimal.Decimal) (ceiling *NodeTree, 
 }
 
 // GetMin gets the min value and flag if found
-func (tree *Tree) GetMin() (node *NodeTree, found bool) {
+func (tree *tree) GetMin() (node *nodeTree, found bool) {
 	return tree.Min, tree.Min != nil
 }
 
 // GetMax gets the max value and flag if found
-func (tree *Tree) GetMax() (node *NodeTree, found bool) {
+func (tree *tree) GetMax() (node *nodeTree, found bool) {
 	return tree.Max, tree.Max != nil
 }
 
-func (tree *Tree) getMinFromNode(node *NodeTree) (foundNode *NodeTree, found bool) {
+func (tree *tree) getMinFromNode(node *nodeTree) (foundNode *nodeTree, found bool) {
 	if node == nil {
 		return nil, false
 
@@ -344,7 +344,7 @@ func (tree *Tree) getMinFromNode(node *NodeTree) (foundNode *NodeTree, found boo
 
 }
 
-func (tree *Tree) getMaxFromNode(node *NodeTree) (foundNode *NodeTree, found bool) {
+func (tree *tree) getMaxFromNode(node *nodeTree) (foundNode *nodeTree, found bool) {
 	if node == nil {
 		return nil, false
 
@@ -358,7 +358,7 @@ func (tree *Tree) getMaxFromNode(node *NodeTree) (foundNode *NodeTree, found boo
 }
 
 // Clear removes all nodes from the tree.
-func (tree *Tree) Clear() {
+func (tree *tree) Clear() {
 	tree.Root = nil
 	tree.size = 0
 	tree.Max = nil
@@ -366,7 +366,7 @@ func (tree *Tree) Clear() {
 }
 
 // String returns a string representation of container
-func (tree *Tree) String() string {
+func (tree *tree) String() string {
 	str := "RedBlackTree\n"
 	if !tree.Empty() {
 		outputTree(tree.Root, "", true, &str)
@@ -374,11 +374,11 @@ func (tree *Tree) String() string {
 	return str
 }
 
-func (node *NodeTree) String() string {
+func (node *nodeTree) String() string {
 	return fmt.Sprintf("%v", node.Key)
 }
 
-func outputTree(node *NodeTree, prefix string, isTail bool, str *string) {
+func outputTree(node *nodeTree, prefix string, isTail bool, str *string) {
 	if node.Right != nil {
 		newPrefix := prefix
 		if isTail {
@@ -406,7 +406,7 @@ func outputTree(node *NodeTree, prefix string, isTail bool, str *string) {
 	}
 }
 
-func (tree *Tree) lookup(key udecimal.Decimal) *NodeTree {
+func (tree *tree) lookup(key udecimal.Decimal) *nodeTree {
 	node := tree.Root
 	for node != nil {
 		compare := tree.Comparator(key, node.Key)
@@ -422,21 +422,21 @@ func (tree *Tree) lookup(key udecimal.Decimal) *NodeTree {
 	return nil
 }
 
-func (node *NodeTree) grandparent() *NodeTree {
+func (node *nodeTree) grandparent() *nodeTree {
 	if node != nil && node.Parent != nil {
 		return node.Parent.Parent
 	}
 	return nil
 }
 
-func (node *NodeTree) uncle() *NodeTree {
+func (node *nodeTree) uncle() *nodeTree {
 	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
 		return nil
 	}
 	return node.Parent.sibling()
 }
 
-func (node *NodeTree) sibling() *NodeTree {
+func (node *nodeTree) sibling() *nodeTree {
 	if node == nil || node.Parent == nil {
 		return nil
 	}
@@ -446,7 +446,7 @@ func (node *NodeTree) sibling() *NodeTree {
 	return node.Parent.Left
 }
 
-func (tree *Tree) rotateLeft(node *NodeTree) {
+func (tree *tree) rotateLeft(node *nodeTree) {
 	right := node.Right
 	tree.replaceNode(node, right)
 	node.Right = right.Left
@@ -457,7 +457,7 @@ func (tree *Tree) rotateLeft(node *NodeTree) {
 	node.Parent = right
 }
 
-func (tree *Tree) rotateRight(node *NodeTree) {
+func (tree *tree) rotateRight(node *nodeTree) {
 	left := node.Left
 	tree.replaceNode(node, left)
 	node.Left = left.Right
@@ -468,7 +468,7 @@ func (tree *Tree) rotateRight(node *NodeTree) {
 	node.Parent = left
 }
 
-func (tree *Tree) replaceNode(old *NodeTree, new *NodeTree) {
+func (tree *tree) replaceNode(old *nodeTree, new *nodeTree) {
 	if old.Parent == nil {
 		tree.Root = new
 	} else {
@@ -483,7 +483,7 @@ func (tree *Tree) replaceNode(old *NodeTree, new *NodeTree) {
 	}
 }
 
-func (tree *Tree) insertCase1(node *NodeTree) {
+func (tree *tree) insertCase1(node *nodeTree) {
 	if node.Parent == nil {
 		node.color = blackTree
 	} else {
@@ -491,14 +491,14 @@ func (tree *Tree) insertCase1(node *NodeTree) {
 	}
 }
 
-func (tree *Tree) insertCase2(node *NodeTree) {
+func (tree *tree) insertCase2(node *nodeTree) {
 	if nodeColorTree(node.Parent) == blackTree {
 		return
 	}
 	tree.insertCase3(node)
 }
 
-func (tree *Tree) insertCase3(node *NodeTree) {
+func (tree *tree) insertCase3(node *nodeTree) {
 	uncle := node.uncle()
 	if nodeColorTree(uncle) == redTree {
 		node.Parent.color = blackTree
@@ -510,7 +510,7 @@ func (tree *Tree) insertCase3(node *NodeTree) {
 	}
 }
 
-func (tree *Tree) insertCase4(node *NodeTree) {
+func (tree *tree) insertCase4(node *nodeTree) {
 	grandparent := node.grandparent()
 	if node == node.Parent.Right && node.Parent == grandparent.Left {
 		tree.rotateLeft(node.Parent)
@@ -522,7 +522,7 @@ func (tree *Tree) insertCase4(node *NodeTree) {
 	tree.insertCase5(node)
 }
 
-func (tree *Tree) insertCase5(node *NodeTree) {
+func (tree *tree) insertCase5(node *nodeTree) {
 	node.Parent.color = blackTree
 	grandparent := node.grandparent()
 	grandparent.color = redTree
@@ -533,7 +533,7 @@ func (tree *Tree) insertCase5(node *NodeTree) {
 	}
 }
 
-func (node *NodeTree) maximumNode() *NodeTree {
+func (node *nodeTree) maximumNode() *nodeTree {
 	if node == nil {
 		return nil
 	}
@@ -543,14 +543,14 @@ func (node *NodeTree) maximumNode() *NodeTree {
 	return node
 }
 
-func (tree *Tree) deleteCase1(node *NodeTree) {
+func (tree *tree) deleteCase1(node *nodeTree) {
 	if node.Parent == nil {
 		return
 	}
 	tree.deleteCase2(node)
 }
 
-func (tree *Tree) deleteCase2(node *NodeTree) {
+func (tree *tree) deleteCase2(node *nodeTree) {
 	sibling := node.sibling()
 	if nodeColorTree(sibling) == redTree {
 		node.Parent.color = redTree
@@ -564,7 +564,7 @@ func (tree *Tree) deleteCase2(node *NodeTree) {
 	tree.deleteCase3(node)
 }
 
-func (tree *Tree) deleteCase3(node *NodeTree) {
+func (tree *tree) deleteCase3(node *nodeTree) {
 	sibling := node.sibling()
 	if nodeColorTree(node.Parent) == blackTree &&
 		nodeColorTree(sibling) == blackTree &&
@@ -577,7 +577,7 @@ func (tree *Tree) deleteCase3(node *NodeTree) {
 	}
 }
 
-func (tree *Tree) deleteCase4(node *NodeTree) {
+func (tree *tree) deleteCase4(node *nodeTree) {
 	sibling := node.sibling()
 	if nodeColorTree(node.Parent) == redTree &&
 		nodeColorTree(sibling) == blackTree &&
@@ -590,7 +590,7 @@ func (tree *Tree) deleteCase4(node *NodeTree) {
 	}
 }
 
-func (tree *Tree) deleteCase5(node *NodeTree) {
+func (tree *tree) deleteCase5(node *nodeTree) {
 	sibling := node.sibling()
 	if node == node.Parent.Left &&
 		nodeColorTree(sibling) == blackTree &&
@@ -610,7 +610,7 @@ func (tree *Tree) deleteCase5(node *NodeTree) {
 	tree.deleteCase6(node)
 }
 
-func (tree *Tree) deleteCase6(node *NodeTree) {
+func (tree *tree) deleteCase6(node *nodeTree) {
 	sibling := node.sibling()
 	sibling.color = nodeColorTree(node.Parent)
 	node.Parent.color = blackTree
@@ -623,7 +623,7 @@ func (tree *Tree) deleteCase6(node *NodeTree) {
 	}
 }
 
-func nodeColorTree(node *NodeTree) colorTree {
+func nodeColorTree(node *nodeTree) colorTree {
 	if node == nil {
 		return blackTree
 	}
@@ -631,9 +631,9 @@ func nodeColorTree(node *NodeTree) colorTree {
 }
 
 // Iterator holding the iterator's state
-type IteratorTree struct {
-	tree     *Tree
-	node     *NodeTree
+type iteratorTree struct {
+	tree     *tree
+	node     *nodeTree
 	position positionTree
 }
 
@@ -644,20 +644,20 @@ const (
 )
 
 // Iterator returns a stateful iterator whose elements are key/value pairs.
-func (tree *Tree) Iterator() IteratorTree {
-	return IteratorTree{tree: tree, node: nil, position: beginTree}
+func (tree *tree) Iterator() iteratorTree {
+	return iteratorTree{tree: tree, node: nil, position: beginTree}
 }
 
 // IteratorAt returns a stateful iterator whose elements are key/value pairs that is initialised at a particular node.
-func (tree *Tree) IteratorAt(node *NodeTree) IteratorTree {
-	return IteratorTree{tree: tree, node: node, position: betweenTree}
+func (tree *tree) IteratorAt(node *nodeTree) iteratorTree {
+	return iteratorTree{tree: tree, node: node, position: betweenTree}
 }
 
 // Next moves the iterator to the next element and returns true if there was a next element in the container.
 // If Next() returns true, then next element's key and value can be retrieved by Key() and Value().
 // If Next() was called for the first time, then it will point the iterator to the first element if it exists.
 // Modifies the state of the iterator.
-func (iterator *IteratorTree) Next() bool {
+func (iterator *iteratorTree) Next() bool {
 	if iterator.position == endTree {
 		goto end
 	}
@@ -699,7 +699,7 @@ between:
 // Prev moves the iterator to the previous element and returns true if there was a previous element in the container.
 // If Prev() returns true, then previous element's key and value can be retrieved by Key() and Value().
 // Modifies the state of the iterator.
-func (iterator *IteratorTree) Prev() bool {
+func (iterator *iteratorTree) Prev() bool {
 	if iterator.position == beginTree {
 		goto begin
 	}
@@ -740,26 +740,26 @@ between:
 
 // Value returns the current element's value.
 // Does not modify the state of the iterator.
-func (iterator *IteratorTree) Value() *OrderQueue {
+func (iterator *iteratorTree) Value() *orderQueue {
 	return iterator.node.Value
 }
 
 // Key returns the current element's key.
 // Does not modify the state of the iterator.
-func (iterator *IteratorTree) Key() udecimal.Decimal {
+func (iterator *iteratorTree) Key() udecimal.Decimal {
 	return iterator.node.Key
 }
 
 // Begin resets the iterator to its initial state (one-before-first)
 // Call Next() to fetch the first element if any.
-func (iterator *IteratorTree) Begin() {
+func (iterator *iteratorTree) Begin() {
 	iterator.node = nil
 	iterator.position = beginTree
 }
 
 // End moves the iterator past the last element (one-past-the-end).
 // Call Prev() to fetch the last element if any.
-func (iterator *IteratorTree) End() {
+func (iterator *iteratorTree) End() {
 	iterator.node = nil
 	iterator.position = endTree
 }
@@ -767,7 +767,7 @@ func (iterator *IteratorTree) End() {
 // First moves the iterator to the first element and returns true if there was a first element in the container.
 // If First() returns true, then first element's key and value can be retrieved by Key() and Value().
 // Modifies the state of the iterator
-func (iterator *IteratorTree) First() bool {
+func (iterator *iteratorTree) First() bool {
 	iterator.Begin()
 	return iterator.Next()
 }
@@ -775,7 +775,7 @@ func (iterator *IteratorTree) First() bool {
 // Last moves the iterator to the last element and returns true if there was a last element in the container.
 // If Last() returns true, then last element's key and value can be retrieved by Key() and Value().
 // Modifies the state of the iterator.
-func (iterator *IteratorTree) Last() bool {
+func (iterator *iteratorTree) Last() bool {
 	iterator.End()
 	return iterator.Prev()
 }

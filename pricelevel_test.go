@@ -7,7 +7,7 @@ import (
 )
 
 func TestPriceLevel(t *testing.T) {
-	ot := NewPriceLevel(BidPrice)
+	ot := newPriceLevel(BidPrice)
 
 	o1 := NewOrder(
 		1,
@@ -68,7 +68,7 @@ func TestPriceLevel(t *testing.T) {
 }
 
 func TestPriceFinding(t *testing.T) {
-	os := NewPriceLevel(AskPrice)
+	os := newPriceLevel(AskPrice)
 
 	os.Append(NewOrder(1, Limit, Sell, decimal.New(5, 0), decimal.New(130, 0), decimal.Zero, None))
 	os.Append(NewOrder(2, Limit, Sell, decimal.New(5, 0), decimal.New(170, 0), decimal.Zero, None))
@@ -100,7 +100,7 @@ func TestPriceFinding(t *testing.T) {
 }
 
 func TestStopQueuePriceFinding(t *testing.T) {
-	os := NewPriceLevel(StopPrice)
+	os := newPriceLevel(StopPrice)
 
 	os.Append(NewOrder(1, Limit, Sell, decimal.New(5, 0), decimal.New(10, 0), decimal.New(130, 0), None))
 	os.Append(NewOrder(2, Limit, Sell, decimal.New(5, 0), decimal.New(20, 0), decimal.New(170, 0), None))

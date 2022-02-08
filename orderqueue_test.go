@@ -8,7 +8,7 @@ import (
 
 func TestOrderQueue(t *testing.T) {
 	price := decimal.New(100, 0)
-	oq := NewOrderQueue(price)
+	oq := newOrderQueue(price)
 
 	o1 := NewOrder(
 		1,
