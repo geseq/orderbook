@@ -137,7 +137,7 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 		return
 	}
 
-	qtyProcessed := decimal.Zero
+	var qtyProcessed decimal.Decimal
 	if side == Buy {
 		qtyProcessed = ob.asks.processLimitOrder(ob, price.GreaterThanOrEqual, id, quantity, flag == AoN, flag == FoK)
 	} else {
