@@ -21,6 +21,7 @@ This is an experiment to see how far I can take the performance of a full fledge
 - [x] Order cancellation. (No in-book updates. Updates will have to be handled with Cancel+Create, and all that entails)
 - [x] Stop loss orders
 - [x] AoN, IoC, FoK, etc. Probably not trailing stops. They're probably better handled outside the order book.
+- [ ] Snapshot the ordebook state for recovery
 - [ ] Handle any GC latency shenanigans
 - [ ] Extensive tests and benchmarks
 - [x] Extremely high throughput. (At the moment 2.7 million Order Add/Cancel per second on 2.5 Ghz Intel Xeon W with 2666 Mhz DDR4)
