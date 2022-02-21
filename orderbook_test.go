@@ -43,14 +43,18 @@ func (e *EmptyTrades) Put(o Trade) {
 var owg sync.WaitGroup
 var twg sync.WaitGroup
 
+var tok uint64
+
 func addDepth(ob *OrderBook, prefix uint64, quantity decimal.Decimal) {
 	var i uint64
 	for i = 50; i < 100; i = i + 10 {
-		ob.ProcessOrder(prefix*1000+i, Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		ob.ProcessOrder(tok, prefix*1000+i, Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		tok++
 	}
 
 	for i = 100; i < 150; i = i + 10 {
-		ob.ProcessOrder(prefix*1000+i, Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		ob.ProcessOrder(tok, prefix*1000+i, Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		tok++
 	}
 }
 
@@ -79,7 +83,8 @@ func TestLimitOrder_Create(t *testing.T) {
 	quantity := decimal.New(2, 0)
 	for i := 50; i < 100; i = i + 10 {
 		resetTest(done, trades)
-		ob.ProcessOrder(uint64(i), Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		ob.ProcessOrder(tok, uint64(i), Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		tok++
 		assert.Len(t, *done, 1)
 		assert.Len(t, *trades, 0)
 		require.NoError(t, getError(done))
@@ -87,7 +92,8 @@ func TestLimitOrder_Create(t *testing.T) {
 
 	for i := 100; i < 150; i = i + 10 {
 		resetTest(done, trades)
-		ob.ProcessOrder(uint64(i), Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		ob.ProcessOrder(tok, uint64(i), Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		tok++
 		assert.Len(t, *done, 1)
 		assert.Len(t, *trades, 0)
 		require.NoError(t, getError(done))
@@ -103,7 +109,8 @@ func TestLimitOrder_CreateBuy(t *testing.T) {
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100100, Limit, Buy, decimal.New(1, 0), decimal.New(100, 0), decimal.Zero, None)
+	ob.ProcessOrder(tok, 100100, Limit, Buy, decimal.New(1, 0), decimal.New(100, 0), decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 	tr := *trades
@@ -118,7 +125,8 @@ func TestLimitOrder_CreateBuy(t *testing.T) {
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100150, Limit, Buy, decimal.New(10, 0), decimal.New(150, 0), decimal.Zero, None)
+	ob.ProcessOrder(tok, 100150, Limit, Buy, decimal.New(10, 0), decimal.New(150, 0), decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 	require.Len(t, *done, 1)
@@ -137,7 +145,8 @@ func TestLimitOrder_CreateWithZeroQty(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100070, Limit, Sell, decimal.New(0, 0), decimal.New(40, 0), decimal.Zero, None)
+	ob.ProcessOrder(tok, 100070, Limit, Sell, decimal.New(0, 0), decimal.New(40, 0), decimal.Zero, None)
+	tok++
 
 	require.Len(t, *done, 1)
 	require.Error(t, getError(done))
@@ -149,7 +158,8 @@ func TestLimitOrder_CreateWithZeroPrice(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100070, Limit, Sell, decimal.New(10, 0), decimal.New(0, 0), decimal.Zero, None)
+	ob.ProcessOrder(tok, 100070, Limit, Sell, decimal.New(10, 0), decimal.New(0, 0), decimal.Zero, None)
+	tok++
 
 	require.Len(t, *done, 1)
 	require.Error(t, getError(done))
@@ -161,8 +171,10 @@ func TestLimitOrder_CreateAndCancel(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(101070, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, None)
-	ob.CancelOrder(101070)
+	ob.ProcessOrder(tok, 101070, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, None)
+	tok++
+	ob.CancelOrder(tok, 101070)
+	tok++
 
 	d := *done
 	assert.Len(t, d, 2)
@@ -175,7 +187,8 @@ func TestLimitOrder_CancelNonExistent(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.CancelOrder(108100)
+	ob.CancelOrder(tok, 108100)
+	tok++
 
 	d := *done
 	assert.Len(t, d, 1)
@@ -188,8 +201,10 @@ func TestLimitOrder_CreateAndCancelWithinProcess(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(101071, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, None)
-	ob.ProcessOrder(101071, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, Cancel)
+	ob.ProcessOrder(tok, 101071, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, None)
+	tok++
+	ob.ProcessOrder(tok, 101071, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, Cancel)
+	tok++
 
 	d := *done
 	assert.Len(t, d, 2)
@@ -202,7 +217,8 @@ func TestLimitOrder_CancelNonExistentWithinProcess(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(108100, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, Cancel)
+	ob.ProcessOrder(tok, 108100, Limit, Sell, decimal.New(10, 0), decimal.New(1000, 0), decimal.Zero, Cancel)
+	tok++
 
 	d := *done
 	assert.Len(t, d, 1)
@@ -215,7 +231,8 @@ func TestLimitOrder_CreateIOCWithNoMatches(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(103100, Limit, Sell, decimal.New(1, 0), decimal.New(200, 0), decimal.Zero, IoC)
+	ob.ProcessOrder(tok, 103100, Limit, Sell, decimal.New(1, 0), decimal.New(200, 0), decimal.Zero, IoC)
+	tok++
 
 	require.NoError(t, getError(done))
 	d := *done
@@ -231,7 +248,8 @@ func TestLimitOrder_CreateIOCWithMatches(t *testing.T) {
 	resetTest(done, trades)
 	t.Log(ob)
 
-	ob.ProcessOrder(103100, Limit, Sell, decimal.New(1, 0), decimal.New(90, 0), decimal.Zero, IoC)
+	ob.ProcessOrder(tok, 103100, Limit, Sell, decimal.New(1, 0), decimal.New(90, 0), decimal.Zero, IoC)
+	tok++
 
 	require.NoError(t, getError(done))
 	d := *done
@@ -249,7 +267,8 @@ func TestLimitOrder_CreateSell(t *testing.T) {
 
 	t.Log(ob)
 
-	ob.ProcessOrder(103140, Limit, Sell, decimal.New(11, 0), decimal.New(40, 0), decimal.Zero, None)
+	ob.ProcessOrder(tok, 103140, Limit, Sell, decimal.New(11, 0), decimal.New(40, 0), decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 	assert.Len(t, *done, 1)
@@ -258,7 +277,8 @@ func TestLimitOrder_CreateSell(t *testing.T) {
 	assert.True(t, quantityProcessed.Equal(decimal.New(10, 0)))
 
 	resetTest(done, trades)
-	ob.ProcessOrder(103143, Limit, Sell, decimal.New(11, 0), decimal.New(1, 0), decimal.Zero, IoC)
+	ob.ProcessOrder(tok, 103143, Limit, Sell, decimal.New(11, 0), decimal.New(1, 0), decimal.Zero, IoC)
+	tok++
 
 	require.NoError(t, getError(done))
 	assert.Len(t, *done, 0)
@@ -272,7 +292,8 @@ func TestLimitOrder_ClearSellBestPriceFirst(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(108900, Limit, Buy, decimal.New(11, 0), decimal.New(1, 0), decimal.Zero, None)
+	ob.ProcessOrder(tok, 108900, Limit, Buy, decimal.New(11, 0), decimal.New(1, 0), decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 	assert.Len(t, *done, 1)
@@ -282,7 +303,8 @@ func TestLimitOrder_ClearSellBestPriceFirst(t *testing.T) {
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(113900, Limit, Sell, decimal.New(11, 0), decimal.New(1, 0), decimal.Zero, None)
+	ob.ProcessOrder(tok, 113900, Limit, Sell, decimal.New(11, 0), decimal.New(1, 0), decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 	assert.Len(t, *done, 1)
@@ -296,7 +318,8 @@ func TestMarketProcess(t *testing.T) {
 	addDepth(ob, 0, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100800, Market, Buy, decimal.New(3, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100800, Market, Buy, decimal.New(3, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 
@@ -305,13 +328,15 @@ func TestMarketProcess(t *testing.T) {
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100802, Market, Buy, decimal.New(0, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100802, Market, Buy, decimal.New(0, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.Error(t, getError(done))
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100901, Market, Sell, decimal.New(12, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100901, Market, Sell, decimal.New(12, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 
@@ -321,7 +346,8 @@ func TestMarketProcess(t *testing.T) {
 	assert.True(t, quantityProcessed.Equal(decimal.New(10, 0)))
 
 	resetTest(done, trades)
-	ob.ProcessOrder(101803, Market, Buy, decimal.New(12, 0), decimal.Zero, decimal.Zero, AoN)
+	ob.ProcessOrder(tok, 101803, Market, Buy, decimal.New(12, 0), decimal.Zero, decimal.Zero, AoN)
+	tok++
 
 	require.NoError(t, getError(done))
 	assert.Len(t, *done, 0)
@@ -331,7 +357,8 @@ func TestMarketProcess(t *testing.T) {
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(101804, Market, Buy, decimal.New(12, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 101804, Market, Buy, decimal.New(12, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 	assert.Len(t, *done, 0)
@@ -348,7 +375,8 @@ func TestMarketProcess2(t *testing.T) {
 	addDepth(ob, 1, decimal.New(2, 0))
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100801, Market, Buy, decimal.New(6, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100801, Market, Buy, decimal.New(6, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.NoError(t, getError(done))
 
@@ -362,7 +390,8 @@ func TestStopPlace(t *testing.T) {
 	quantity := decimal.New(2, 0)
 	for i := 50; i < 100; i = i + 10 {
 		resetTest(done, trades)
-		ob.ProcessOrder(uint64(i), Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.New(uint64(10), 0), None)
+		ob.ProcessOrder(tok, uint64(i), Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.New(uint64(10), 0), None)
+		tok++
 
 		require.Len(t, *done, 0)
 		require.NoError(t, getError(done))
@@ -373,7 +402,8 @@ func TestStopPlace(t *testing.T) {
 
 	for i := 100; i < 150; i = i + 10 {
 		resetTest(done, trades)
-		ob.ProcessOrder(uint64(i), Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.New(uint64(200), 0), None)
+		ob.ProcessOrder(tok, uint64(i), Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.New(uint64(200), 0), None)
+		tok++
 
 		require.Len(t, *done, 0)
 		require.NoError(t, getError(done))
@@ -384,7 +414,8 @@ func TestStopPlace(t *testing.T) {
 
 	for i := 150; i < 200; i = i + 10 {
 		resetTest(done, trades)
-		ob.ProcessOrder(uint64(i), Market, Buy, quantity, decimal.Zero, decimal.New(uint64(5), 0), None)
+		ob.ProcessOrder(tok, uint64(i), Market, Buy, quantity, decimal.Zero, decimal.New(uint64(5), 0), None)
+		tok++
 
 		require.Len(t, *done, 0)
 		require.NoError(t, getError(done))
@@ -396,8 +427,10 @@ func TestStopPlace(t *testing.T) {
 	for i := 200; i < 250; i = i + 10 {
 		resetTest(done, trades)
 
-		ob.ProcessOrder(uint64(i), Limit, Sell, quantity, decimal.Zero, decimal.New(uint64(210), 0), None)
-		ob.ProcessOrder(uint64(i), Market, Buy, quantity, decimal.Zero, decimal.New(uint64(5), 0), None)
+		ob.ProcessOrder(tok, uint64(i), Limit, Sell, quantity, decimal.Zero, decimal.New(uint64(210), 0), None)
+		tok++
+		ob.ProcessOrder(tok, uint64(i), Market, Buy, quantity, decimal.Zero, decimal.New(uint64(5), 0), None)
+		tok++
 
 		require.Len(t, *done, 1)
 		require.Error(t, getError(done))
@@ -415,18 +448,22 @@ func TestStopProcess(t *testing.T) {
 
 	addDepth(ob, 0, decimal.New(2, 0))
 
-	ob.ProcessOrder(100100, Limit, Buy, decimal.New(1, 0), decimal.New(100, 0), decimal.New(110, 0), None)
+	ob.ProcessOrder(tok, 100100, Limit, Buy, decimal.New(1, 0), decimal.New(100, 0), decimal.New(110, 0), None)
+	tok++
 
 	require.Len(t, *trades, 0)
 	require.NoError(t, getError(done))
 
-	ob.ProcessOrder(100101, Market, Buy, decimal.New(2, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100101, Market, Buy, decimal.New(2, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
-	ob.ProcessOrder(100102, Market, Buy, decimal.New(2, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100102, Market, Buy, decimal.New(2, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100103, Market, Sell, decimal.New(2, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100103, Market, Sell, decimal.New(2, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.Len(t, *trades, 2)
 	tr := *trades
@@ -436,19 +473,23 @@ func TestStopProcess(t *testing.T) {
 
 	// reset last price to over 110
 
-	ob.ProcessOrder(100104, Market, Buy, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100104, Market, Buy, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	resetTest(done, trades)
-	ob.ProcessOrder(100105, Market, Buy, decimal.New(2, 0), decimal.Zero, decimal.New(110, 0), None)
+	ob.ProcessOrder(tok, 100105, Market, Buy, decimal.New(2, 0), decimal.Zero, decimal.New(110, 0), None)
+	tok++
 	require.Len(t, *trades, 0)
 
 	require.NoError(t, getError(done))
 
-	ob.ProcessOrder(100106, Market, Buy, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100106, Market, Buy, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100107, Market, Sell, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100107, Market, Sell, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.Len(t, *trades, 2)
 
@@ -457,14 +498,16 @@ func TestStopProcess(t *testing.T) {
 	require.True(t, tr[1].Qty.Equal(decimal.New(2, 0)))
 
 	resetTest(done, trades)
-	ob.ProcessOrder(100206, Market, Sell, decimal.New(2, 0), decimal.Zero, decimal.New(100, 0), None)
+	ob.ProcessOrder(tok, 100206, Market, Sell, decimal.New(2, 0), decimal.Zero, decimal.New(100, 0), None)
+	tok++
 
 	require.Len(t, *trades, 0)
 	require.NoError(t, getError(done))
 
 	resetTest(done, trades)
 
-	ob.ProcessOrder(100207, Market, Sell, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	ob.ProcessOrder(tok, 100207, Market, Sell, decimal.New(1, 0), decimal.Zero, decimal.Zero, None)
+	tok++
 
 	require.Len(t, *trades, 3)
 	tr = *trades
@@ -483,12 +526,14 @@ func addBenchDepth(ob *OrderBook, prefix uint64, quantity decimal.Decimal) {
 	var i uint64
 	for i = 50; i < 100; i = i + 10 {
 		j++
-		ob.ProcessOrder(j, Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		ob.ProcessOrder(tok, j, Limit, Buy, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		tok++
 	}
 
 	for i = 100; i < 150; i = i + 10 {
 		j++
-		ob.ProcessOrder(j, Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		ob.ProcessOrder(tok, j, Limit, Sell, quantity, decimal.New(uint64(i), 0), decimal.Zero, None)
+		tok++
 	}
 
 }
@@ -526,7 +571,8 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i += 1 {
 		order := orders[i]
-		ob.ProcessOrder(order.ID, order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
+		ob.ProcessOrder(tok, order.ID, order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
+		tok++
 	}
 	b.StopTimer()
 	elapsed := time.Since(stopwatch)
@@ -535,6 +581,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 }
 
 func getTestOrderBook() (*[]OrderNotification, *[]Trade, *OrderBook) {
+	tok = 1
 	on := &OrderHandler{}
 	tn := &Trades{}
 	ob := NewOrderBook(on, tn)

@@ -1,6 +1,8 @@
 package orderbook
 
 import (
+	"sync/atomic"
+
 	decimal "github.com/geseq/udecimal"
 )
 
@@ -60,6 +62,7 @@ type OrderBook struct {
 
 	lastStopPrice decimal.Decimal
 	lastPrice     decimal.Decimal
+	lastToken     uint64
 	lastOrderID   uint64
 }
 
@@ -87,11 +90,15 @@ func NewOrderBook(orderStateHandler OrderStateHandler, tradeHandler TradeHandler
 //      flag      - immediate or cancel, all or none, fill or kill, Cancel (ob.IoC or ob.AoN or ob.FoK or ob.Cancel)
 //      * to create new decimal number you should use udecimal.New() func
 //        read more at https://github.com/geseq/udecimal
-func (ob *OrderBook) ProcessOrder(id uint64, class ClassType, side SideType, quantity, price, stopPrice decimal.Decimal, flag FlagType) {
+func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType, quantity, price, stopPrice decimal.Decimal, flag FlagType) {
 	switch flag {
 	case Cancel:
-		ob.CancelOrder(id)
+		ob.CancelOrder(tok, id)
 		return
+	}
+
+	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
+		panic("invalid token received: cannot maintain determinism")
 	}
 
 	if id <= ob.lastOrderID {
@@ -206,7 +213,11 @@ func (ob *OrderBook) Order(orderID uint64) *Order {
 }
 
 // CancelOrder removes order with given ID from the order book
-func (ob *OrderBook) CancelOrder(orderID uint64) {
+func (ob *OrderBook) CancelOrder(tok, orderID uint64) {
+	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
+		panic("invalid token received: cannot maintain determinism")
+	}
+
 	o := ob.cancelOrder(orderID)
 	if o == nil {
 		ob.orderNotification.Put(OrderNotification{orderID, OrderCancelRejected, decimal.Zero, ErrOrderNotExists})
