@@ -543,6 +543,7 @@ func BenchmarkOrderbook(b *testing.B) {
 }
 
 func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
+	tok = 1
 	on := &EmptyOrderHandler{}
 	tn := &EmptyTrades{}
 	ob := NewOrderBook(on, tn)
