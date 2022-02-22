@@ -548,14 +548,14 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	tn := &EmptyTrades{}
 	ob := NewOrderBook(on, tn)
 
-	orders := make([]Order, b.N)
-	for i := 0; i < b.N; i += 1 {
+	orders := make([]Order, 1000_000)
+	for i := 0; i < 1000_000; i++ {
 		side := Buy
 		class := Limit
 		if rand.Intn(10) < 5 {
 			side = Sell
 		}
-		if rand.Intn(10) < 5 {
+		if rand.Intn(10) < 7 {
 			class = Market
 		}
 
@@ -575,7 +575,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	stopwatch := time.Now()
 	b.ResetTimer()
 	for i := 0; i < b.N; i += 1 {
-		order := orders[i]
+		order := orders[rand.Intn(999_999)]
 		ob.ProcessOrder(tok, order.ID, order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
 		tok++
 	}
