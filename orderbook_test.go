@@ -551,13 +551,17 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	orders := make([]Order, b.N)
 	for i := 0; i < b.N; i += 1 {
 		side := Buy
+		class := Limit
 		if rand.Intn(10) < 5 {
 			side = Sell
+		}
+		if rand.Intn(10) < 5 {
+			class = Market
 		}
 
 		orders[i] = Order{
 			ID:        uint64(i),
-			Class:     Limit,
+			Class:     class,
 			Side:      side,
 			Flag:      None,
 			Qty:       decimal.NewI(uint64(rand.Intn(1000)), 0),
