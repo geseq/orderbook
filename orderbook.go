@@ -64,11 +64,13 @@ type OrderBook struct {
 	lastPrice     decimal.Decimal
 	lastToken     uint64
 	lastOrderID   uint64
+
+	matching bool
 }
 
 // NewOrderBook creates Orderbook object
-func NewOrderBook(orderStateHandler OrderStateHandler, tradeHandler TradeHandler) *OrderBook {
-	return &OrderBook{
+func NewOrderBook(orderStateHandler OrderStateHandler, tradeHandler TradeHandler, opts ...Option) *OrderBook {
+	ob := &OrderBook{
 		orders:            map[uint64]*Order{},
 		stopOrders:        map[uint64]*Order{},
 		bids:              newPriceLevel(BidPrice),
@@ -77,6 +79,11 @@ func NewOrderBook(orderStateHandler OrderStateHandler, tradeHandler TradeHandler
 		orderNotification: orderStateHandler,
 		tradeNotification: tradeHandler,
 	}
+
+	options(defaultOpts).applyTo(ob)
+	options(opts).applyTo(ob)
+
+	return ob
 }
 
 // ProcessOrder places new order to the OrderBook
@@ -111,6 +118,28 @@ func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType
 	if stopPrice.GreaterThan(decimal.Zero) {
 		ob.stopOrders[id] = ob.stops.Append(NewOrder(id, class, side, quantity, price, stopPrice, flag))
 		return
+	}
+
+	if !ob.matching {
+		// If matching is disabled reject all orders that cross the book
+		if class == Market {
+			ob.orderNotification.Put(OrderNotification{id, OrderRejected, quantity, ErrNoMatching})
+			return
+		}
+
+		if side == Buy {
+			q := ob.asks.GetQueue()
+			if q != nil && q.Price().LessThanOrEqual(price) {
+				ob.orderNotification.Put(OrderNotification{id, OrderRejected, quantity, ErrNoMatching})
+				return
+			}
+		} else {
+			q := ob.bids.GetQueue()
+			if q != nil && q.Price().GreaterThanOrEqual(price) {
+				ob.orderNotification.Put(OrderNotification{id, OrderRejected, quantity, ErrNoMatching})
+				return
+			}
+		}
 	}
 
 	ob.processOrder(id, class, side, quantity, price, flag)

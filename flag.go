@@ -23,6 +23,8 @@ func (f FlagType) String() string {
 		return "cancel"
 	case Snapshot:
 		return "snapshot"
+	case None:
+		return "none"
 	default:
 		return ""
 	}

@@ -10,4 +10,5 @@ var (
 	ErrOrderExists          = errors.New("orderbook: order already exists")
 	ErrOrderNotExists       = errors.New("orderbook: order does not exist")
 	ErrInsufficientQuantity = errors.New("orderbook: insufficient quantity to calculate price")
+	ErrNoMatching           = errors.New("orderbook: matching disabled")
 )
