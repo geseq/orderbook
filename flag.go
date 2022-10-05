@@ -6,7 +6,6 @@ const (
 	IoC
 	AoN
 	FoK
-	Cancel
 	Snapshot
 )
 
@@ -19,8 +18,6 @@ func (f FlagType) String() string {
 		return "AoN"
 	case FoK:
 		return "FoK"
-	case Cancel:
-		return "cancel"
 	case Snapshot:
 		return "snapshot"
 	case None:

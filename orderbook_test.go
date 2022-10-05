@@ -125,8 +125,6 @@ func processLine(ob *OrderBook, line string) {
 		flag = AoN
 	case "F":
 		flag = FoK
-	case "C":
-		flag = Cancel
 	case "S":
 		flag = Snapshot
 	}
@@ -265,33 +263,6 @@ func TestLimitOrder_CancelNonExistent(t *testing.T) {
 
 	ob.CancelOrder(tok, 8100)
 	tok++
-
-	d := *done
-	assert.Len(t, d, 1)
-	assert.Equal(t, OrderCancelRejected, d[0].Status)
-	assert.Equal(t, uint64(8100), d[0].OrderID)
-}
-
-func TestLimitOrder_CreateAndCancelWithinProcess(t *testing.T) {
-	done, trades, ob := getTestOrderBook()
-	addDepth(ob, 0)
-	resetTest(done, trades)
-
-	processLine(ob, "171	L	S	10	1000	0	N")
-	processLine(ob, "171	L	S	10	1000	0	C")
-
-	d := *done
-	assert.Len(t, d, 2)
-	assert.Equal(t, OrderCanceled, d[1].Status)
-	assert.Equal(t, uint64(171), d[1].OrderID)
-}
-
-func TestLimitOrder_CancelNonExistentWithinProcess(t *testing.T) {
-	done, trades, ob := getTestOrderBook()
-	addDepth(ob, 0)
-	resetTest(done, trades)
-
-	processLine(ob, "8100	L	S	10	1000	0	C")
 
 	d := *done
 	assert.Len(t, d, 1)

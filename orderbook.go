@@ -98,12 +98,6 @@ func NewOrderBook(orderStateHandler OrderStateHandler, tradeHandler TradeHandler
 //      * to create new decimal number you should use udecimal.New() func
 //        read more at https://github.com/geseq/udecimal
 func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType, quantity, price, stopPrice decimal.Decimal, flag FlagType) {
-	switch flag {
-	case Cancel:
-		ob.CancelOrder(tok, id)
-		return
-	}
-
 	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
 		panic("invalid token received: cannot maintain determinism")
 	}
