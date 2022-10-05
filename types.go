@@ -4,6 +4,9 @@ import (
 	decimal "github.com/geseq/udecimal"
 )
 
+// MsgType represents the type of message
+type MsgType byte
+
 // ClassType of the order
 type ClassType byte
 

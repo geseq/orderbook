@@ -24,6 +24,15 @@ func (o *OrderHandler) Put(on OrderNotification) {
 	o.n = append(o.n, on)
 }
 
+func (o *OrderHandler) String() string {
+	res := make([]string, len(o.n))
+	for _, n := range o.n {
+		res = append(res, n.String())
+	}
+
+	return strings.Join(res, "\n")
+}
+
 type Trades struct {
 	n []Trade
 }
@@ -194,9 +203,9 @@ func TestLimitOrder_CreateBuy(t *testing.T) {
 	require.NoError(t, getError(done))
 	tr := *trades
 	require.Len(t, *trades, 1)
-	assert.Equal(t, OrderFilledPartial, tr[0].MakerStatus)
+	assert.Equal(t, FilledPartial, tr[0].MakerStatus)
 	assert.EqualValues(t, uint64(1100), tr[0].TakerOrderID)
-	assert.Equal(t, OrderFilledComplete, tr[0].TakerStatus)
+	assert.Equal(t, FilledComplete, tr[0].TakerStatus)
 
 	quantityProcessed := getQtyProcessed(trades)
 	require.Len(t, *trades, 1)
@@ -209,8 +218,8 @@ func TestLimitOrder_CreateBuy(t *testing.T) {
 	require.Len(t, *done, 1)
 
 	d := *done
-	assert.Equal(t, OrderQueued, d[0].Status)
-	assert.True(t, d[0].Qty.Equal(decimal.New(1, 0)))
+	assert.Equal(t, Accepted, d[0].Status)
+	assert.True(t, d[0].Qty.Equal(decimal.New(10, 0)))
 
 	quantityProcessed = getQtyProcessed(trades)
 	require.Len(t, *trades, 5)
@@ -252,7 +261,7 @@ func TestLimitOrder_CreateAndCancel(t *testing.T) {
 
 	d := *done
 	assert.Len(t, d, 2)
-	assert.Equal(t, OrderCanceled, d[1].Status)
+	assert.Equal(t, Canceled, d[1].Status)
 	assert.Equal(t, uint64(170), d[1].OrderID)
 }
 
@@ -266,7 +275,7 @@ func TestLimitOrder_CancelNonExistent(t *testing.T) {
 
 	d := *done
 	assert.Len(t, d, 1)
-	assert.Equal(t, OrderCancelRejected, d[0].Status)
+	assert.Equal(t, Rejected, d[0].Status)
 	assert.Equal(t, uint64(8100), d[0].OrderID)
 }
 
@@ -279,7 +288,7 @@ func TestLimitOrder_CreateIOCWithNoMatches(t *testing.T) {
 
 	require.NoError(t, getError(done))
 	d := *done
-	assert.Len(t, d, 0)
+	assert.Len(t, d, 1)
 
 	quantityProcessed := getQtyProcessed(trades)
 	assert.True(t, quantityProcessed.Equal(decimal.New(0, 0)))
@@ -295,7 +304,7 @@ func TestLimitOrder_CreateIOCWithMatches(t *testing.T) {
 
 	require.NoError(t, getError(done))
 	d := *done
-	assert.Len(t, d, 0)
+	assert.Len(t, d, 1)
 	assert.Len(t, *trades, 1)
 
 	quantityProcessed := getQtyProcessed(trades)
@@ -321,7 +330,7 @@ func TestLimitOrder_CreateSell(t *testing.T) {
 	processLine(ob, "343	L	S	11	1	0	I")
 
 	require.NoError(t, getError(done))
-	assert.Len(t, *done, 0)
+	assert.Len(t, *done, 1)
 
 	quantityProcessed = getQtyProcessed(trades)
 	assert.True(t, quantityProcessed.Equal(decimal.New(0, 0)))
@@ -375,7 +384,7 @@ func TestMarketProcess(t *testing.T) {
 
 	require.NoError(t, getError(done))
 
-	assert.Len(t, *done, 0)
+	assert.Len(t, *done, 1)
 
 	quantityProcessed = getQtyProcessed(trades)
 	assert.True(t, quantityProcessed.Equal(decimal.New(10, 0)))
@@ -384,7 +393,7 @@ func TestMarketProcess(t *testing.T) {
 	processLine(ob, "1803	M	B	12	0	0	A")
 
 	require.NoError(t, getError(done))
-	assert.Len(t, *done, 0)
+	assert.Len(t, *done, 1)
 
 	quantityProcessed = getQtyProcessed(trades)
 	assert.True(t, quantityProcessed.Equal(decimal.New(0, 0)))
@@ -394,7 +403,7 @@ func TestMarketProcess(t *testing.T) {
 	processLine(ob, "1804	M	B	12	0	0	N")
 
 	require.NoError(t, getError(done))
-	assert.Len(t, *done, 0)
+	assert.Len(t, *done, 1)
 
 	quantityProcessed = getQtyProcessed(trades)
 	assert.True(t, quantityProcessed.Equal(decimal.New(7, 0)))
