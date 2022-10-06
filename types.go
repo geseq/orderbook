@@ -1,6 +1,8 @@
 package orderbook
 
 import (
+	"fmt"
+
 	decimal "github.com/geseq/udecimal"
 )
 
@@ -33,10 +35,12 @@ type Order struct {
 type Trade struct {
 	MakerOrderID uint64          `json:"makerOrderId" `
 	TakerOrderID uint64          `json:"takerOrderId" `
-	MakerQtyLeft decimal.Decimal `json:"makerQtyLeft" `
-	TakerQtyLeft decimal.Decimal `json:"takerQtyLeft" `
 	MakerStatus  OrderStatus     `json:"makerStatus" `
 	TakerStatus  OrderStatus     `json:"takerStatus" `
 	Price        decimal.Decimal `json:"price" `
 	Qty          decimal.Decimal `json:"qty"`
+}
+
+func (t Trade) String() string {
+	return fmt.Sprintf("%d %d %s %s %s %s", t.MakerOrderID, t.TakerOrderID, t.MakerStatus, t.TakerStatus, t.Qty.String(), t.Price.String())
 }

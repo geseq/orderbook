@@ -16,7 +16,25 @@ type OrderNotification struct {
 
 func (o OrderNotification) String() string {
 	if o.Error != nil {
-		return fmt.Sprintf("%s %s %d %s %s", o.MsgType, o.Status, o.OrderID, o.Qty.String(), o.Error.Error())
+		var errName string
+		switch o.Error {
+		case ErrOrderNotExists:
+			errName = "ErrOrderNotExists"
+		case ErrInvalidQuantity:
+			errName = "ErrInvalidQuantity"
+		case ErrInvalidPrice:
+			errName = "ErrInvalidPrice"
+		case ErrOrderID:
+			errName = "ErrOrderID"
+		case ErrOrderExists:
+			errName = "ErrOrderExists"
+		case ErrInsufficientQuantity:
+			errName = "ErrInsufficientQuantity"
+		case ErrNoMatching:
+			errName = "ErrNoMatching"
+		}
+
+		return fmt.Sprintf("%s %s %d %s %s", o.MsgType, o.Status, o.OrderID, o.Qty.String(), errName)
 	}
 	return fmt.Sprintf("%s %s %d %s", o.MsgType, o.Status, o.OrderID, o.Qty.String())
 }
