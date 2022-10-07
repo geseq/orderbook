@@ -89,21 +89,21 @@ func (oq *orderQueue) process(ob *OrderBook, takerOrderID uint64, qty decimal.De
 			qtyProcessed = qtyProcessed.Add(qty)
 			ho.Qty = ho.Qty.Sub(qty)
 			oq.totalQty = oq.totalQty.Sub(qty)
-			ob.notification.PutTrade(NewTrade(ho.ID, takerOrderID, ho.Price, qty, FilledPartial, FilledComplete))
+			ob.notification.PutTrade(ho.ID, takerOrderID, FilledPartial, FilledComplete, qty, ho.Price)
 			ob.lastPrice = ho.Price
 			return
 		case 1:
 			qtyProcessed = qtyProcessed.Add(ho.Qty)
 			qty = qty.Sub(ho.Qty)
 			ob.cancelOrder(ho.ID)
-			ob.notification.PutTrade(NewTrade(ho.ID, takerOrderID, ho.Price, ho.Qty, FilledComplete, FilledPartial))
+			ob.notification.PutTrade(ho.ID, takerOrderID, FilledComplete, FilledPartial, ho.Qty, ho.Price)
 			ob.lastPrice = ho.Price
 			ordersClosed++
 		case 0:
 			qtyProcessed = qtyProcessed.Add(ho.Qty)
 			qty = qty.Sub(ho.Qty)
 			ob.cancelOrder(ho.ID)
-			ob.notification.PutTrade(NewTrade(ho.ID, takerOrderID, ho.Price, ho.Qty, FilledComplete, FilledComplete))
+			ob.notification.PutTrade(ho.ID, takerOrderID, FilledComplete, FilledComplete, ho.Qty, ho.Price)
 			ob.lastPrice = ho.Price
 			ordersClosed++
 		}

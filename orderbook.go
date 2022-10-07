@@ -8,8 +8,8 @@ import (
 
 // NotificationHandler handles notification updates
 type NotificationHandler interface {
-	PutOrder(OrderNotification)
-	PutTrade(Trade)
+	PutOrder(m MsgType, s OrderStatus, orderID uint64, qty decimal.Decimal, err error)
+	PutTrade(makerOrderID, takerOrderID uint64, makerStatus, takerStatus OrderStatus, qty, price decimal.Decimal)
 }
 
 // OrderBook implements standard matching algorithm
@@ -64,7 +64,7 @@ func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType
 	}
 
 	if id <= ob.lastOrderID {
-		ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Rejected, id, quantity, ErrOrderID})
+		ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrOrderID)
 		return
 	}
 
@@ -73,20 +73,20 @@ func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType
 	if !ob.matching {
 		// If matching is disabled reject all orders that cross the book
 		if class == Market {
-			ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Rejected, id, quantity, ErrNoMatching})
+			ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrNoMatching)
 			return
 		}
 
 		if side == Buy {
 			q := ob.asks.GetQueue()
 			if q != nil && q.Price().LessThanOrEqual(price) {
-				ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Rejected, id, quantity, ErrNoMatching})
+				ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrNoMatching)
 				return
 			}
 		} else {
 			q := ob.bids.GetQueue()
 			if q != nil && q.Price().GreaterThanOrEqual(price) {
-				ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Rejected, id, quantity, ErrNoMatching})
+				ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrNoMatching)
 
 				return
 			}
@@ -94,12 +94,12 @@ func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType
 	}
 
 	if quantity.Equal(decimal.Zero) {
-		ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Rejected, id, quantity, ErrInvalidQuantity})
+		ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrInvalidQuantity)
 		return
 	}
 
 	if stopPrice.GreaterThan(decimal.Zero) {
-		ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Accepted, id, quantity, nil})
+		ob.notification.PutOrder(MsgCreateOrder, Accepted, id, quantity, nil)
 		if side == Buy && stopPrice.LessThanOrEqual(ob.lastPrice) {
 			// Stop buy set under stop price, condition satisfied to trigger
 			ob.processOrder(id, class, side, quantity, price, flag)
@@ -118,17 +118,17 @@ func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType
 
 	if class != Market {
 		if _, ok := ob.orders[id]; ok {
-			ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Rejected, id, decimal.Zero, ErrOrderExists})
+			ob.notification.PutOrder(MsgCreateOrder, Rejected, id, decimal.Zero, ErrOrderExists)
 			return
 		}
 
 		if price.Equal(decimal.Zero) {
-			ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Rejected, id, decimal.Zero, ErrInvalidPrice})
+			ob.notification.PutOrder(MsgCreateOrder, Rejected, id, decimal.Zero, ErrInvalidPrice)
 			return
 		}
 	}
 
-	ob.notification.PutOrder(OrderNotification{MsgCreateOrder, Accepted, id, quantity, nil})
+	ob.notification.PutOrder(MsgCreateOrder, Accepted, id, quantity, nil)
 
 	ob.processOrder(id, class, side, quantity, price, flag)
 	ob.processStopOrders()
@@ -221,11 +221,11 @@ func (ob *OrderBook) CancelOrder(tok, orderID uint64) {
 
 	o := ob.cancelOrder(orderID)
 	if o == nil {
-		ob.notification.PutOrder(OrderNotification{MsgCancelOrder, Rejected, orderID, decimal.Zero, ErrOrderNotExists})
+		ob.notification.PutOrder(MsgCancelOrder, Rejected, orderID, decimal.Zero, ErrOrderNotExists)
 		return
 	}
 
-	ob.notification.PutOrder(OrderNotification{MsgCancelOrder, Canceled, o.ID, o.Qty, nil})
+	ob.notification.PutOrder(MsgCancelOrder, Canceled, o.ID, o.Qty, nil)
 }
 
 // CancelOrder removes order with given ID from the order book

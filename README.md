@@ -25,7 +25,7 @@ This is an experiment to see how far I can take the performance of a full fledge
 - [ ] Handle any GC latency shenanigans
 - [ ] Extensive tests and benchmarks
 - [ ] Add metrics counters
-- [x] Extremely high throughput. (At the moment 2.7 million Order Add/Cancel per second on 2.5 Ghz Intel Xeon W with 2666 Mhz DDR4)
+- [x] Extremely high throughput. (At the moment 5.5 million Order Add/Cancel per second on 2.5 Ghz Intel Xeon W with 2666 Mhz DDR4)
 
 ## Limitations
 
