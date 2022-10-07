@@ -25,7 +25,19 @@ This is an experiment to see how far I can take the performance of a full fledge
 - [ ] Handle any GC latency shenanigans
 - [ ] Extensive tests and benchmarks
 - [ ] Add metrics counters
-- [x] Extremely high throughput. (At the moment 5.5 million Order Add/Cancel per second on 2.5 Ghz Intel Xeon W with 2666 Mhz DDR4)
+- [x] Extremely high throughput (see below)
+
+
+## Throughput
+ - [x]  10 million Order Add/Cancel per second:
+   - 2.1 Ghz Base Frequency 12th Gen i7 with 5200 Mhz LPDDR5
+   - Turbo Boost disbabled
+   - Hyperthreading disabled
+  
+ - [x] 20 million Order Add/Cancel per second sustained for 1 hour on:
+   -   2.1 Ghz Base Frequency 12th Gen i7 with 5200 Mhz LPDDR5
+   -   Turbo Boost enabled 4.7 Ghz
+   -   Hyperthreading disabled
 
 ## Limitations
 
