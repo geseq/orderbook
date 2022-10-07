@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,55 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type Stringer interface {
-	String() string
-}
-
-type Notification struct {
-	n []Stringer
-}
-
-func (o *Notification) Reset() {
-	o.n = []Stringer{}
-}
-
-func (o *Notification) PutOrder(on OrderNotification) {
-	o.n = append(o.n, on)
-}
-
-func (o *Notification) PutTrade(t Trade) {
-	o.n = append(o.n, t)
-}
-
-func (o *Notification) Strings() []string {
-	res := make([]string, 0, len(o.n))
-	for _, n := range o.n {
-		res = append(res, n.String())
-	}
-
-	return res
-}
-
-func (o *Notification) String() string {
-	return strings.TrimSpace(strings.Join(o.Strings(), "\n"))
-}
-
-func (o *Notification) Verify(t *testing.T, expected []string) {
-	assert.Equal(t, expected, o.Strings())
-}
-
-type EmptyNotification struct {
-}
-
-func (e *EmptyNotification) PutOrder(o OrderNotification) {
-}
-
-func (e *EmptyNotification) PutTrade(o Trade) {
-}
-
-var owg sync.WaitGroup
-var twg sync.WaitGroup
 
 var tok uint64
 
@@ -171,7 +121,7 @@ func getQtyProcessed(trades *[]Trade) decimal.Decimal {
 
 func getError(notifications []Stringer) error {
 	for _, notification := range notifications {
-		if n, ok := notification.(OrderNotification); ok && n.Error != nil {
+		if n, ok := notification.(orderNotification); ok && n.Error != nil {
 			return n.Error
 		}
 	}
@@ -532,4 +482,83 @@ func getTestOrderBook() (*Notification, *OrderBook) {
 	ob := NewOrderBook(on)
 
 	return on, ob
+}
+
+type orderNotification struct {
+	MsgType MsgType
+	Status  OrderStatus
+	OrderID uint64
+	Qty     decimal.Decimal
+	Error   error
+}
+
+func (o orderNotification) String() string {
+	if o.Error != nil {
+		var errName string
+		switch o.Error {
+		case ErrOrderNotExists:
+			errName = "ErrOrderNotExists"
+		case ErrInvalidQuantity:
+			errName = "ErrInvalidQuantity"
+		case ErrInvalidPrice:
+			errName = "ErrInvalidPrice"
+		case ErrOrderID:
+			errName = "ErrOrderID"
+		case ErrOrderExists:
+			errName = "ErrOrderExists"
+		case ErrInsufficientQuantity:
+			errName = "ErrInsufficientQuantity"
+		case ErrNoMatching:
+			errName = "ErrNoMatching"
+		}
+
+		return fmt.Sprintf("%s %s %d %s %s", o.MsgType, o.Status, o.OrderID, o.Qty.String(), errName)
+	}
+	return fmt.Sprintf("%s %s %d %s", o.MsgType, o.Status, o.OrderID, o.Qty.String())
+}
+
+type Stringer interface {
+	String() string
+}
+
+type Notification struct {
+	n []Stringer
+}
+
+func (o *Notification) Reset() {
+	o.n = []Stringer{}
+}
+
+func (o *Notification) PutOrder(m MsgType, s OrderStatus, orderID uint64, qty decimal.Decimal, err error) {
+	o.n = append(o.n, orderNotification{m, s, orderID, qty, err})
+}
+
+func (o *Notification) PutTrade(mID, tID uint64, mStatus, tStatus OrderStatus, qty, price decimal.Decimal) {
+	o.n = append(o.n, Trade{mID, tID, mStatus, tStatus, qty, price})
+}
+
+func (o *Notification) Strings() []string {
+	res := make([]string, 0, len(o.n))
+	for _, n := range o.n {
+		res = append(res, n.String())
+	}
+
+	return res
+}
+
+func (o *Notification) String() string {
+	return strings.TrimSpace(strings.Join(o.Strings(), "\n"))
+}
+
+func (o *Notification) Verify(t *testing.T, expected []string) {
+	assert.Equal(t, expected, o.Strings())
+}
+
+type EmptyNotification struct {
+}
+
+func (o *EmptyNotification) PutOrder(m MsgType, s OrderStatus, orderID uint64, qty decimal.Decimal, err error) {
+}
+
+func (e *EmptyNotification) PutTrade(mID, tID uint64, mStatus, tStatus OrderStatus, qty, price decimal.Decimal) {
 }

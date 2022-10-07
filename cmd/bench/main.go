@@ -14,10 +14,10 @@ import (
 type EmptyNotification struct {
 }
 
-func (e *EmptyNotification) PutOrder(o orderbook.OrderNotification) {
+func (e *EmptyNotification) PutOrder(m orderbook.MsgType, s orderbook.OrderStatus, orderID uint64, qty decimal.Decimal, err error) {
 }
 
-func (e *EmptyNotification) PutTrade(o orderbook.Trade) {
+func (e *EmptyNotification) PutTrade(mOID, tOID uint64, mStatus, tStatus orderbook.OrderStatus, qty, price decimal.Decimal) {
 }
 
 func getPrice(bid, ask, diff decimal.Decimal, dec bool) (decimal.Decimal, decimal.Decimal) {
@@ -60,6 +60,7 @@ func main() {
 
 	start := time.Now()
 	end := time.Now().Add(time.Duration(*duration) * time.Second)
+	diff := time.Duration(0)
 	for time.Now().Before(end) {
 		var r = rand.Intn(10)
 		dec := r < 5
@@ -71,6 +72,7 @@ func main() {
 			bid, ask = getPrice(bid, ask, minSpread, true)
 		}
 
+		ds := time.Now()
 		tok = tok + 1
 		ob.CancelOrder(tok, buyID)
 		tok = tok + 1
@@ -81,12 +83,14 @@ func main() {
 		sellID = tok
 		ob.ProcessOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
 		ob.ProcessOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
+		diff += time.Now().Sub(ds)
 		atomic.AddUint64(&ops, 4) // 4 cancels and adds
 
-		if time.Now().Sub(start).Seconds() > 10 {
-			fmt.Printf("ops/s: %d\n", ops/(*pd))
+		if uint64(time.Now().Sub(start).Seconds()) > *pd {
+			fmt.Printf("ops/s: %d\n", ops/uint64(diff.Seconds()))
 			ops = 0
 			start = time.Now()
+			diff = 0
 		}
 	}
 }

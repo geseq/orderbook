@@ -38,8 +38,8 @@ type Trade struct {
 	TakerOrderID uint64          `json:"takerOrderId" `
 	MakerStatus  OrderStatus     `json:"makerStatus" `
 	TakerStatus  OrderStatus     `json:"takerStatus" `
-	Price        decimal.Decimal `json:"price" `
 	Qty          decimal.Decimal `json:"qty"`
+	Price        decimal.Decimal `json:"price" `
 }
 
 func (t Trade) String() string {
