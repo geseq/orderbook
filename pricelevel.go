@@ -71,6 +71,7 @@ func (pl *priceLevel) Append(o *Order) *Order {
 	}
 	pl.numOrders++
 	pl.volume = pl.volume.Add(o.Qty)
+	o.queue = priceQueue
 	return priceQueue.Append(o)
 }
 
@@ -78,12 +79,8 @@ func (pl *priceLevel) Append(o *Order) *Order {
 func (pl *priceLevel) Remove(o *Order) *Order {
 	price := o.GetPrice(pl.priceType)
 
-	priceQueue, ok := pl.priceTree.Get(price)
-	if !ok {
-		return nil
-	}
+	priceQueue := o.queue
 	o = priceQueue.Remove(o)
-
 	if priceQueue.Len() == 0 {
 		pl.priceTree.Remove(price)
 		pl.depth--

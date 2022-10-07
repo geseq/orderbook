@@ -27,6 +27,7 @@ type Order struct {
 	Qty       decimal.Decimal `json:"qty" `
 	Price     decimal.Decimal `json:"price" `
 	StopPrice decimal.Decimal `json:"stopPrice" `
+	queue     *orderQueue
 	prev      *Order
 	next      *Order
 }
