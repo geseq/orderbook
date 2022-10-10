@@ -427,6 +427,30 @@ func TestStopProcess(t *testing.T) {
 	})
 }
 
+func TestStopProcess_Limit(t *testing.T) {
+	n, ob := getTestOrderBook()
+	addDepth(ob, 0)
+	n.Reset()
+
+	processLine(ob, "100	L	S	1	90	90	N")
+	processLine(ob, "101	M	B	2	0	0	N") // @ LP 100.
+	processLine(ob, "103	M	S	2	0	0	N") // @ LP 90. SL S trigger.
+	processLine(ob, "104	M	B	1	0	0	N") // @ LP 110.
+	processLine(ob, "105	M	S	1	0	0	N") // @ LP 90. Match against SL triggered order.
+
+	n.Verify(t, []string{
+		"CreateOrder Accepted 100 1",
+		"CreateOrder Accepted 101 2",
+		"6 101 FilledComplete FilledComplete 2 100",
+		"CreateOrder Accepted 103 2",
+		"CreateOrder Accepted 104 1",
+		"7 104 FilledPartial FilledComplete 2 110",
+		"CreateOrder Accepted 105 2",
+		"100 105 FilledComplete FilledComplete 1 90",
+		"9 105 FilledPartial FilledComplete 1 130",
+	})
+}
+
 var j uint64
 var k uint64 = 100000
 
