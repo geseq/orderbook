@@ -97,7 +97,7 @@ func processLine(ob *OrderBook, line string) {
 		flag = Snapshot
 	}
 
-	ob.ProcessOrder(tok, uint64(oid), class, side, qty, price, stopPrice, flag)
+	ob.AddOrder(tok, uint64(oid), class, side, qty, price, stopPrice, flag)
 	tok++
 }
 
@@ -467,7 +467,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i += 1 {
 		order := orders[rand.Intn(999_999)]
-		ob.ProcessOrder(tok, order.ID, order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
+		ob.AddOrder(tok, order.ID, order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
 		tok++
 	}
 	b.StopTimer()

@@ -106,10 +106,10 @@ func main() {
 			tok = tok + 1
 			sellID = tok
 			s = monotime.Now()
-			ob.ProcessOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
+			ob.AddOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
 			ah.Record(float64(monotime.Now() - s))
 			s = monotime.Now()
-			ob.ProcessOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
+			ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
 			ah.Record(float64(monotime.Now() - s))
 			diff += monotime.Now() - ds
 			atomic.AddUint64(&ops, 4) // 4 cancels and adds
