@@ -25,6 +25,7 @@ This is an experiment to see how far I can take the performance of a full fledge
 - [ ] Handle any GC latency shenanigans
 - [ ] Extensive tests and benchmarks
 - [ ] Add metrics counters
+- [ ] Improve consistent latency
 - [x] Extremely high throughput (see below)
 
 
