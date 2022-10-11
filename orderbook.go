@@ -47,7 +47,7 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 	return ob
 }
 
-// ProcessOrder places new order to the OrderBook
+// AddOrder places new order to the OrderBook
 // Arguments:
 //      orderID   - unique order ID in depth (uint64)
 //      class     - what class of order do you want to place (ob.Market or ob.Limit)
@@ -58,7 +58,7 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 //      flag      - immediate or cancel, all or none, fill or kill, Cancel (ob.IoC or ob.AoN or ob.FoK or ob.Cancel)
 //      * to create new decimal number you should use udecimal.New() func
 //        read more at https://github.com/geseq/udecimal
-func (ob *OrderBook) ProcessOrder(tok, id uint64, class ClassType, side SideType, quantity, price, stopPrice decimal.Decimal, flag FlagType) {
+func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, quantity, price, stopPrice decimal.Decimal, flag FlagType) {
 	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
 		panic("invalid token received: cannot maintain determinism")
 	}
