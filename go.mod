@@ -6,6 +6,7 @@ require (
 	fortio.org/fortio v1.38.0
 	github.com/aristanetworks/goarista v0.0.0-20221010155517-65572eb1a1f2
 	github.com/geseq/udecimal v0.0.0-20211126195629-659dde5a92d8
+	github.com/loov/hrtime v1.0.3
 	github.com/stretchr/testify v1.7.0
 )
 
