@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"fortio.org/fortio/stats"
-	"github.com/aristanetworks/goarista/monotime"
 	"github.com/geseq/orderbook"
 	decimal "github.com/geseq/udecimal"
+	"github.com/loov/hrtime"
 )
 
 type EmptyNotification struct {
@@ -78,6 +78,13 @@ func main() {
 		var tok, buyID, sellID uint64
 		var ops uint64
 
+		// calibrate
+		c := hrtime.TSC()
+		c.ApproxDuration()
+		c = hrtime.TSC()
+		log.Println(hrtime.TSCSince(c).ApproxDuration())
+
+		log.Println("starting benchmark")
 		start := time.Now()
 		end := time.Now().Add(time.Duration(*duration) * time.Second)
 		var diff uint64
@@ -92,26 +99,26 @@ func main() {
 				bid, ask = getPrice(bid, ask, minSpread, true)
 			}
 
-			ds := monotime.Now()
+			ds := hrtime.TSC()
 			tok = tok + 1
-			s := monotime.Now()
+			s := hrtime.TSC()
 			ob.CancelOrder(tok, buyID)
-			ch.Record(float64(monotime.Now() - s))
+			ch.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
 			tok = tok + 1
-			s = monotime.Now()
+			s = hrtime.TSC()
 			ob.CancelOrder(tok, sellID)
-			ch.Record(float64(monotime.Now() - s))
+			ch.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
 			tok = tok + 1
 			buyID = tok
 			tok = tok + 1
 			sellID = tok
-			s = monotime.Now()
+			s = hrtime.TSC()
 			ob.AddOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
-			ah.Record(float64(monotime.Now() - s))
-			s = monotime.Now()
+			ah.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
+			s = hrtime.TSC()
 			ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
-			ah.Record(float64(monotime.Now() - s))
-			diff += monotime.Now() - ds
+			ah.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
+			diff += uint64(hrtime.TSCSince(ds).ApproxDuration())
 			atomic.AddUint64(&ops, 4) // 4 cancels and adds
 
 			if uint64(time.Now().Sub(start).Seconds()) > *pd {
