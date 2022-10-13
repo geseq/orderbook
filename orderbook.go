@@ -16,16 +16,18 @@ type NotificationHandler interface {
 type OrderBook struct {
 	asks       *priceLevel
 	bids       *priceLevel
-	stops      *priceLevel
+	stopBuys   *priceLevel
+	stopSells  *priceLevel
+	takeBuys   *priceLevel
+	takeSells  *priceLevel
 	orders     map[uint64]*Order // orderId -> *Order
-	stopOrders map[uint64]*Order // orderId -> *Order
+	trigOrders map[uint64]*Order // orderId -> *Order
+	trigQueue  *triggerQueue
 
 	notification NotificationHandler
 
-	lastStopPrice decimal.Decimal
-	lastPrice     decimal.Decimal
-	lastToken     uint64
-	lastOrderID   uint64
+	lastPrice decimal.Decimal
+	lastToken uint64
 
 	matching bool
 }
@@ -34,10 +36,14 @@ type OrderBook struct {
 func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 	ob := &OrderBook{
 		orders:       map[uint64]*Order{},
-		stopOrders:   map[uint64]*Order{},
+		trigOrders:   map[uint64]*Order{},
+		trigQueue:    newTriggerQueue(),
 		bids:         newPriceLevel(BidPrice),
 		asks:         newPriceLevel(AskPrice),
-		stops:        newPriceLevel(StopPrice),
+		stopBuys:     newPriceLevel(StopPrice),
+		stopSells:    newPriceLevel(StopPrice),
+		takeBuys:     newPriceLevel(TakePrice),
+		takeSells:    newPriceLevel(TakePrice),
 		notification: n,
 	}
 
@@ -63,12 +69,10 @@ func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, qu
 		panic("invalid token received: cannot maintain determinism")
 	}
 
-	if id <= ob.lastOrderID {
-		ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrOrderID)
+	if quantity.Equal(decimal.Zero) {
+		ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrInvalidQuantity)
 		return
 	}
-
-	ob.lastOrderID = id
 
 	if !ob.matching {
 		// If matching is disabled reject all orders that cross the book
@@ -93,26 +97,13 @@ func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, qu
 		}
 	}
 
-	if quantity.Equal(decimal.Zero) {
-		ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrInvalidQuantity)
-		return
-	}
+	if flag&(StopLoss|TakeProfit) != 0 {
+		if stopPrice.IsZero() {
+			ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrInvalidPrice)
+		}
 
-	if stopPrice.GreaterThan(decimal.Zero) {
 		ob.notification.PutOrder(MsgCreateOrder, Accepted, id, quantity, nil)
-		if side == Buy && stopPrice.LessThanOrEqual(ob.lastPrice) {
-			// Stop buy set under stop price, condition satisfied to trigger
-			ob.processOrder(id, class, side, quantity, price, flag)
-			return
-		}
-
-		if side == Sell && ob.lastPrice.LessThanOrEqual(stopPrice) {
-			// Stop sell set over stop price, condition satisfied to trigger
-			ob.processOrder(id, class, side, quantity, price, flag)
-			return
-		}
-
-		ob.stopOrders[id] = ob.stops.Append(NewOrder(id, class, side, quantity, price, stopPrice, flag))
+		ob.addStopOrTake(id, class, side, quantity, price, stopPrice, flag)
 		return
 	}
 
@@ -129,13 +120,64 @@ func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, qu
 	}
 
 	ob.notification.PutOrder(MsgCreateOrder, Accepted, id, quantity, nil)
-
 	ob.processOrder(id, class, side, quantity, price, flag)
-	ob.processStopOrders()
+
 	return
 }
 
+func (ob *OrderBook) addStopOrTake(id uint64, class ClassType, side SideType, quantity, price, stPrice decimal.Decimal, flag FlagType) {
+	switch flag {
+	case StopLoss:
+		switch side {
+		case Buy:
+			if stPrice.LessThanOrEqual(ob.lastPrice) {
+				// Stop buy set under stop price, condition satisfied to trigger
+				ob.processOrder(id, class, side, quantity, price, flag)
+				return
+			}
+
+			ob.trigOrders[id] = ob.stopBuys.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+		case Sell:
+			if ob.lastPrice.LessThanOrEqual(stPrice) {
+				// Stop sell set over stop price, condition satisfied to trigger
+				ob.processOrder(id, class, side, quantity, price, flag)
+				return
+			}
+
+			ob.trigOrders[id] = ob.stopSells.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+		}
+	case TakeProfit:
+		switch side {
+		case Buy:
+			if ob.lastPrice.LessThanOrEqual(stPrice) {
+				// Stop buy set under stop price, condition satisfied to trigger
+				ob.processOrder(id, class, side, quantity, price, flag)
+				return
+			}
+
+			ob.trigOrders[id] = ob.takeBuys.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+		case Sell:
+			if stPrice.LessThanOrEqual(ob.lastPrice) {
+				// Stop sell set over stop price, condition satisfied to trigger
+				ob.processOrder(id, class, side, quantity, price, flag)
+				return
+			}
+
+			ob.trigOrders[id] = ob.takeSells.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+		}
+	}
+}
+
 func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, quantity, price decimal.Decimal, flag FlagType) {
+	lp := ob.lastPrice
+	defer func() {
+		if lp == ob.lastPrice {
+			return
+		}
+		ob.queueTriggeredOrders()
+		ob.processTriggeredOrders()
+	}()
+
 	if class == Market {
 		if side == Buy {
 			ob.asks.processMarketOrder(ob, id, quantity, flag == AoN, flag == FoK)
@@ -170,31 +212,36 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 	return
 }
 
-func (ob *OrderBook) processStopOrders() {
-	for !ob.lastPrice.Equal(ob.lastStopPrice) {
-		if ob.lastPrice.GreaterThan(ob.lastStopPrice) {
-			stops := ob.stops.SmallestGreaterThan(ob.lastStopPrice)
-			for stops != nil && stops.Price().LessThanOrEqual(ob.lastPrice) {
-				for stops.Len() > 0 {
-					stop := stops.Head()
-					ob.processOrder(stop.ID, stop.Class, stop.Side, stop.Qty, stop.Price, stop.Flag)
-					ob.stops.Remove(stop)
-				}
-				stops = ob.stops.SmallestGreaterThan(ob.lastStopPrice)
-			}
-		} else {
-			stops := ob.stops.LargestLessThan(ob.lastStopPrice)
-			for stops != nil && stops.Price().GreaterThanOrEqual(ob.lastPrice) {
-				for stops.Len() > 0 {
-					stop := stops.Head()
-					ob.processOrder(stop.ID, stop.Class, stop.Side, stop.Qty, stop.Price, stop.Flag)
-					ob.stops.Remove(stop)
-				}
-				stops = ob.stops.LargestLessThan(ob.lastStopPrice)
-			}
-		}
+func (ob *OrderBook) queueTriggeredOrders() {
+	if ob.lastPrice.IsZero() {
+		return
+	}
 
-		ob.lastStopPrice = ob.lastPrice
+	lastPrice := ob.lastPrice
+	stops := ob.stopBuys.LargestLessThanOrEqual(lastPrice)
+	for stops != nil {
+		for stops.Len() > 0 {
+			stop := stops.Head()
+			ob.stopBuys.Remove(stop)
+			ob.trigQueue.Push(stop)
+		}
+		stops = ob.stopBuys.LargestLessThanOrEqual(lastPrice)
+	}
+
+	stops = ob.stopSells.SmallestGreaterThanOrEqual(lastPrice)
+	for stops != nil {
+		for stops.Len() > 0 {
+			stop := stops.Head()
+			ob.stopSells.Remove(stop)
+			ob.trigQueue.Push(stop)
+		}
+		stops = ob.stopSells.SmallestGreaterThanOrEqual(lastPrice)
+	}
+}
+
+func (ob *OrderBook) processTriggeredOrders() {
+	for o := ob.trigQueue.Pop(); o != nil; o = ob.trigQueue.Pop() {
+		ob.processOrder(o.ID, o.Class, o.Side, o.Qty, o.Price, o.Flag)
 	}
 }
 
@@ -202,7 +249,7 @@ func (ob *OrderBook) processStopOrders() {
 func (ob *OrderBook) Order(orderID uint64) *Order {
 	o, ok := ob.orders[orderID]
 	if !ok {
-		o, ok := ob.stopOrders[orderID]
+		o, ok := ob.trigOrders[orderID]
 		if !ok {
 			return nil
 		}
@@ -232,13 +279,7 @@ func (ob *OrderBook) CancelOrder(tok, orderID uint64) {
 func (ob *OrderBook) cancelOrder(orderID uint64) *Order {
 	o, ok := ob.orders[orderID]
 	if !ok {
-		o, ok := ob.stopOrders[orderID]
-		if !ok {
-			return nil
-		}
-
-		delete(ob.stopOrders, orderID)
-		return ob.stops.Remove(o)
+		return ob.cancelStopsAndTakes(orderID)
 	}
 
 	delete(ob.orders, orderID)
@@ -248,6 +289,27 @@ func (ob *OrderBook) cancelOrder(orderID uint64) *Order {
 	}
 
 	return ob.asks.Remove(o)
+}
+
+func (ob *OrderBook) cancelStopsAndTakes(orderID uint64) *Order {
+	o, ok := ob.trigOrders[orderID]
+	if !ok {
+		return nil
+	}
+
+	delete(ob.trigOrders, orderID)
+
+	if (o.Flag & StopLoss) != 0 {
+		if o.Side == Buy {
+			return ob.stopBuys.Remove(o)
+		}
+		return ob.stopSells.Remove(o)
+	}
+
+	if o.Side == Buy {
+		return ob.takeBuys.Remove(o)
+	}
+	return ob.takeSells.Remove(o)
 }
 
 // CalculateMarketPrice returns total market price for requested quantity
