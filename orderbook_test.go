@@ -93,6 +93,10 @@ func processLine(ob *OrderBook, line string) {
 		flag = AoN
 	case "F":
 		flag = FoK
+	case "SL":
+		flag = StopLoss
+	case "TP":
+		flag = TakeProfit
 	case "S":
 		flag = Snapshot
 	}
@@ -339,20 +343,20 @@ func TestStopPlace(t *testing.T) {
 	n, ob := getTestOrderBook()
 
 	for i := 50; i < 100; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d	L	B	2	%d	10	N", i, i))
+		processLine(ob, fmt.Sprintf("%d	L	B	2	%d	10	SL", i, i))
 	}
 
 	for i := 100; i < 150; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d	L	S	2	%d	200	N", i, i))
+		processLine(ob, fmt.Sprintf("%d	L	S	2	%d	200	SL", i, i))
 	}
 
 	for i := 150; i < 200; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d	M	B	2	0	5	N", i))
+		processLine(ob, fmt.Sprintf("%d	M	B	2	0	5	SL", i))
 	}
 
 	for i := 200; i < 250; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d1	L	S	2	0	210	N", i))
-		processLine(ob, fmt.Sprintf("%d2	M	B	2	0	5	N", i))
+		processLine(ob, fmt.Sprintf("%d1	L	S	2	0	210	SL", i))
+		processLine(ob, fmt.Sprintf("%d2	M	B	2	0	5	SL", i))
 	}
 
 	n.Verify(t, []string{
@@ -391,15 +395,15 @@ func TestStopProcess(t *testing.T) {
 	addDepth(ob, 0)
 	n.Reset()
 
-	processLine(ob, "100	L	B	1	100	110	N")
+	processLine(ob, "100	L	B	1	100	110	SL")
 	processLine(ob, "101	M	B	2	0	0	N")
-	processLine(ob, "102	M	B	2	0	0	N")
+	processLine(ob, "102	M	B	2	0	0	N") // LP 110
 	processLine(ob, "103	M	S	2	0	0	N")
 	processLine(ob, "104	M	B	1	0	0	N")
-	processLine(ob, "105	M	B	2	0	110	N") // @ LP 120. This should trigger immediately
+	processLine(ob, "105	M	B	2	0	110	SL") // @ LP 120. This should trigger immediately
 	processLine(ob, "106	M	B	1	0	0	N")
 	processLine(ob, "107	M	S	1	0	0	N")
-	processLine(ob, "206	M	S	2	0	100	N") // @ LP 90. This should trigger immediately
+	processLine(ob, "206	M	S	2	0	100	SL") // @ LP 90. This should trigger immediately
 	processLine(ob, "207	M	S	1	0	0	N")
 
 	n.Verify(t, []string{
@@ -433,7 +437,7 @@ func TestStopProcess_Limit(t *testing.T) {
 	n.Reset()
 
 	processLine(ob, "100	M	B	1	0	0	N") // @ LP 100.
-	processLine(ob, "101	L	S	1	90	90	N")
+	processLine(ob, "101	L	S	1	90	90	SL")
 	processLine(ob, "102	M	B	1	0	0	N") // @ LP 100.
 	processLine(ob, "103	M	S	2	0	0	N") // @ LP 90. SL S trigger.
 	processLine(ob, "104	M	B	1	0	0	N") // @ LP 90.
@@ -460,7 +464,7 @@ func TestStopProcess_Market(t *testing.T) {
 	n.Reset()
 
 	processLine(ob, "100	M	B	1	0	0	N") // @ LP 100.
-	processLine(ob, "101	M	S	1	0	90	N")
+	processLine(ob, "101	M	S	1	0	90	SL")
 	processLine(ob, "102	M	B	1	0	0	N") // @ LP 100.
 	processLine(ob, "103	M	S	2	0	0	N") // @ LP 90. SL S trigger. LP 80
 	processLine(ob, "104	M	B	1	0	0	N") // @ LP 110.

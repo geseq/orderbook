@@ -33,6 +33,9 @@ const (
 
 	// StopPrice is for stop loss orders
 	StopPrice
+
+	// TakePrice is for take profit orders
+	TakePrice
 )
 
 // newPriceLevel creates new priceLevel manager
@@ -123,6 +126,26 @@ func (pl *priceLevel) LargestLessThan(price decimal.Decimal) *orderQueue {
 // SmallestGreaterThan returns smallest orderQueue with price greater than given
 func (pl *priceLevel) SmallestGreaterThan(price decimal.Decimal) *orderQueue {
 	if node, ok := pl.priceTree.SmallestGreaterThan(price); ok {
+		return node.Value
+	}
+
+	return nil
+}
+
+// LargestLessThanOrEqual returns largest orderQueue with price less than or
+// equal to given
+func (pl *priceLevel) LargestLessThanOrEqual(price decimal.Decimal) *orderQueue {
+	if node, ok := pl.priceTree.Floor(price); ok {
+		return node.Value
+	}
+
+	return nil
+}
+
+// SmallestGreaterThanOrEqual returns smallest orderQueue with price greater than
+// or equal to given
+func (pl *priceLevel) SmallestGreaterThanOrEqual(price decimal.Decimal) *orderQueue {
+	if node, ok := pl.priceTree.Ceiling(price); ok {
 		return node.Value
 	}
 
