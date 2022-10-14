@@ -526,7 +526,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i += 1 {
 		order := orders[rand.Intn(999_999)]
-		ob.AddOrder(tok, order.ID, order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
+		ob.AddOrder(tok, uint64(i), order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
 		tok++
 	}
 	b.StopTimer()
