@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
 	"runtime"
 	"runtime/debug"
 	"sync"
@@ -13,10 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"fortio.org/fortio/stats"
 	"github.com/geseq/orderbook"
 	decimal "github.com/geseq/udecimal"
-	"github.com/loov/hrtime"
 )
 
 type EmptyNotification struct {
@@ -72,19 +69,11 @@ func main() {
 
 		on := &EmptyNotification{}
 		ob := orderbook.NewOrderBook(on)
-		ah := stats.NewHistogram(10, 1)
-		ch := stats.NewHistogram(10, 1)
 
 		var tok, buyID, sellID uint64
 		var ops uint64
 
-		// calibrate
-		c := hrtime.TSC()
-		c.ApproxDuration()
-		c = hrtime.TSC()
-		log.Println(hrtime.TSCSince(c).ApproxDuration())
-
-		log.Println("starting benchmark")
+		log.Println("starting throughput benchmark")
 		start := time.Now()
 		end := time.Now().Add(time.Duration(*duration) * time.Second)
 		var diff uint64
@@ -99,26 +88,18 @@ func main() {
 				bid, ask = getPrice(bid, ask, minSpread, true)
 			}
 
-			ds := hrtime.TSC()
+			ds := time.Now()
 			tok = tok + 1
-			s := hrtime.TSC()
 			ob.CancelOrder(tok, buyID)
-			ch.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
 			tok = tok + 1
-			s = hrtime.TSC()
 			ob.CancelOrder(tok, sellID)
-			ch.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
 			tok = tok + 1
 			buyID = tok
 			tok = tok + 1
 			sellID = tok
-			s = hrtime.TSC()
 			ob.AddOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
-			ah.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
-			s = hrtime.TSC()
 			ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
-			ah.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
-			diff += uint64(hrtime.TSCSince(ds).ApproxDuration())
+			diff += uint64(time.Now().Sub(ds))
 			atomic.AddUint64(&ops, 4) // 4 cancels and adds
 
 			if uint64(time.Now().Sub(start).Seconds()) > *pd {
@@ -128,9 +109,6 @@ func main() {
 				diff = 0
 			}
 		}
-
-		ah.Print(os.Stdout, "Add Results", []float64{50, 75, 90, 95, 99, 99.9, 99.99, 100})
-		ch.Print(os.Stdout, "Cancel Results", []float64{50, 75, 90, 95, 99, 99.9, 99.99, 100})
 
 		wg.Done()
 	}()
