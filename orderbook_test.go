@@ -83,7 +83,7 @@ func processLine(ob *OrderBook, line string) {
 
 	qty, _ := decimal.Parse(strings.TrimSpace(parts[3]))
 	price, _ := decimal.Parse(strings.TrimSpace(parts[4]))
-	stopPrice, _ := decimal.Parse(strings.TrimSpace(parts[5]))
+	trigPrice, _ := decimal.Parse(strings.TrimSpace(parts[5]))
 
 	flag := None
 	switch strings.TrimSpace(parts[6]) {
@@ -101,7 +101,7 @@ func processLine(ob *OrderBook, line string) {
 		flag = Snapshot
 	}
 
-	ob.AddOrder(tok, uint64(oid), class, side, qty, price, stopPrice, flag)
+	ob.AddOrder(tok, uint64(oid), class, side, qty, price, trigPrice, flag)
 	tok++
 }
 
@@ -516,7 +516,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 			Flag:      None,
 			Qty:       decimal.NewI(uint64(rand.Intn(1000)), 0),
 			Price:     decimal.NewI(uint64(rand.Intn(100000)), uint(rand.Intn(3))),
-			StopPrice: decimal.Zero,
+			TrigPrice: decimal.Zero,
 		}
 	}
 
@@ -526,7 +526,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i += 1 {
 		order := orders[rand.Intn(999_999)]
-		ob.AddOrder(tok, uint64(i), order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
+		ob.AddOrder(tok, uint64(i), order.Class, order.Side, order.Price, order.Qty, order.TrigPrice, order.Flag) // 1 ts
 		tok++
 	}
 	b.StopTimer()

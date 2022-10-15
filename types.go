@@ -26,7 +26,7 @@ type Order struct {
 	Flag      FlagType        `json:"flag" `
 	Qty       decimal.Decimal `json:"qty" `
 	Price     decimal.Decimal `json:"price" `
-	StopPrice decimal.Decimal `json:"stopPrice" `
+	TrigPrice decimal.Decimal `json:"trigPrice" `
 	queue     *orderQueue
 	prev      *Order
 	next      *Order

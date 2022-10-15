@@ -31,8 +31,8 @@ const (
 	// AskPrice is for ask orders
 	AskPrice
 
-	// StopPrice is for stop loss orders
-	StopPrice
+	// TrigPrice is for stop loss / take profit orders
+	TrigPrice
 
 	// TakePrice is for take profit orders
 	TakePrice
