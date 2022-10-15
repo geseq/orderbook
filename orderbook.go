@@ -40,8 +40,8 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 		trigQueue:    newTriggerQueue(),
 		bids:         newPriceLevel(BidPrice),
 		asks:         newPriceLevel(AskPrice),
-		stopBuys:     newPriceLevel(StopPrice),
-		stopSells:    newPriceLevel(StopPrice),
+		stopBuys:     newPriceLevel(TrigPrice),
+		stopSells:    newPriceLevel(TrigPrice),
 		takeBuys:     newPriceLevel(TakePrice),
 		takeSells:    newPriceLevel(TakePrice),
 		notification: n,
@@ -60,11 +60,11 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 //      side      - what do you want to do (ob.Sell or ob.Buy)
 //      quantity  - how much quantity you want to sell or buy (decimal)
 //      price     - no more expensive (or cheaper) this price (decimal)
-//      stopPrice - create a stop order until market price crosses this price (decimal)
+//      trigPrice - create a stop/take order until market price reaches this price (decimal)
 //      flag      - immediate or cancel, all or none, fill or kill, Cancel (ob.IoC or ob.AoN or ob.FoK or ob.Cancel)
 //      * to create new decimal number you should use udecimal.New() func
 //        read more at https://github.com/geseq/udecimal
-func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, quantity, price, stopPrice decimal.Decimal, flag FlagType) {
+func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, quantity, price, trigPrice decimal.Decimal, flag FlagType) {
 	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
 		panic("invalid token received: cannot maintain determinism")
 	}
@@ -98,12 +98,12 @@ func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, qu
 	}
 
 	if flag&(StopLoss|TakeProfit) != 0 {
-		if stopPrice.IsZero() {
+		if trigPrice.IsZero() {
 			ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrInvalidPrice)
 		}
 
 		ob.notification.PutOrder(MsgCreateOrder, Accepted, id, quantity, nil)
-		ob.addStopOrTake(id, class, side, quantity, price, stopPrice, flag)
+		ob.addStopOrTake(id, class, side, quantity, price, trigPrice, flag)
 		return
 	}
 
@@ -279,7 +279,7 @@ func (ob *OrderBook) CancelOrder(tok, orderID uint64) {
 func (ob *OrderBook) cancelOrder(orderID uint64) *Order {
 	o, ok := ob.orders[orderID]
 	if !ok {
-		return ob.cancelStopsAndTakes(orderID)
+		return ob.cancelTrigOrders(orderID)
 	}
 
 	delete(ob.orders, orderID)
@@ -291,7 +291,7 @@ func (ob *OrderBook) cancelOrder(orderID uint64) *Order {
 	return ob.asks.Remove(o)
 }
 
-func (ob *OrderBook) cancelStopsAndTakes(orderID uint64) *Order {
+func (ob *OrderBook) cancelTrigOrders(orderID uint64) *Order {
 	o, ok := ob.trigOrders[orderID]
 	if !ok {
 		return nil
