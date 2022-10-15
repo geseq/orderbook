@@ -9,7 +9,7 @@ import (
 )
 
 // NewOrder creates new constant object Order
-func NewOrder(orderID uint64, class ClassType, side SideType, qty, price, stopPrice decimal.Decimal, flag FlagType) *Order {
+func NewOrder(orderID uint64, class ClassType, side SideType, qty, price, trigPrice decimal.Decimal, flag FlagType) *Order {
 	if class == Market {
 		price = decimal.Zero
 	}
@@ -21,14 +21,14 @@ func NewOrder(orderID uint64, class ClassType, side SideType, qty, price, stopPr
 		Flag:      flag,
 		Qty:       qty,
 		Price:     price,
-		StopPrice: stopPrice,
+		TrigPrice: trigPrice,
 	}
 }
 
 // GetPrice returns the price of the Order
 func (o *Order) GetPrice(t PriceType) decimal.Decimal {
-	if t == StopPrice {
-		return o.StopPrice
+	if t == TrigPrice {
+		return o.TrigPrice
 	}
 	return o.Price
 }
@@ -47,7 +47,7 @@ func (o *Order) Compose() []byte {
 	b, _ = o.Price.MarshalBinary()
 	buf.Write(b)
 
-	b, _ = o.StopPrice.MarshalBinary()
+	b, _ = o.TrigPrice.MarshalBinary()
 	buf.Write(b)
 
 	buf.WriteByte(byte(o.Class))
@@ -65,8 +65,8 @@ func (o *Order) Decompose(b []byte) error {
 	b, _ = qty.UnmarshalBinaryData(b)
 	price := decimal.Decimal{}
 	b, _ = price.UnmarshalBinaryData(b)
-	stopPrice := decimal.Decimal{}
-	b, _ = stopPrice.UnmarshalBinaryData(b)
+	trigPrice := decimal.Decimal{}
+	b, _ = trigPrice.UnmarshalBinaryData(b)
 
 	if len(b) != 3 {
 		return errors.New("decompose failed: invalid bytes provided")
@@ -78,7 +78,7 @@ func (o *Order) Decompose(b []byte) error {
 		Side:      SideType(b[1]),
 		Qty:       qty,
 		Price:     price,
-		StopPrice: stopPrice,
+		TrigPrice: trigPrice,
 		Flag:      FlagType(b[2]),
 	}
 	*o = ord

@@ -19,12 +19,13 @@ This is an experiment to see how far I can take the performance of a full fledge
 - [x] Standard price-time priority
 - [x] Market and limit orders
 - [x] Order cancellation. (No in-book updates. Updates will have to be handled with Cancel+Create, and all that entails)
-- [x] Stop loss orders
+- [x] Stop loss / take profit orders (limit and market)
 - [x] AoN, IoC, FoK, etc. Probably not trailing stops. They're probably better handled outside the order book.
 - [ ] Snapshot the ordebook state for recovery
 - [ ] Handle any GC latency shenanigans
 - [ ] Extensive tests and benchmarks
 - [ ] Add metrics counters
+- [ ] Improve consistent latency
 - [x] Extremely high throughput (see below)
 
 

@@ -100,7 +100,7 @@ func TestPriceFinding(t *testing.T) {
 }
 
 func TestStopQueuePriceFinding(t *testing.T) {
-	os := newPriceLevel(StopPrice)
+	os := newPriceLevel(TrigPrice)
 
 	os.Append(NewOrder(1, Limit, Sell, decimal.New(5, 0), decimal.New(10, 0), decimal.New(130, 0), None))
 	os.Append(NewOrder(2, Limit, Sell, decimal.New(5, 0), decimal.New(20, 0), decimal.New(170, 0), None))

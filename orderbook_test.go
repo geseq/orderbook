@@ -83,7 +83,7 @@ func processLine(ob *OrderBook, line string) {
 
 	qty, _ := decimal.Parse(strings.TrimSpace(parts[3]))
 	price, _ := decimal.Parse(strings.TrimSpace(parts[4]))
-	stopPrice, _ := decimal.Parse(strings.TrimSpace(parts[5]))
+	trigPrice, _ := decimal.Parse(strings.TrimSpace(parts[5]))
 
 	flag := None
 	switch strings.TrimSpace(parts[6]) {
@@ -93,11 +93,15 @@ func processLine(ob *OrderBook, line string) {
 		flag = AoN
 	case "F":
 		flag = FoK
+	case "SL":
+		flag = StopLoss
+	case "TP":
+		flag = TakeProfit
 	case "S":
 		flag = Snapshot
 	}
 
-	ob.ProcessOrder(tok, uint64(oid), class, side, qty, price, stopPrice, flag)
+	ob.AddOrder(tok, uint64(oid), class, side, qty, price, trigPrice, flag)
 	tok++
 }
 
@@ -339,20 +343,20 @@ func TestStopPlace(t *testing.T) {
 	n, ob := getTestOrderBook()
 
 	for i := 50; i < 100; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d	L	B	2	%d	10	N", i, i))
+		processLine(ob, fmt.Sprintf("%d	L	B	2	%d	10	SL", i, i))
 	}
 
 	for i := 100; i < 150; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d	L	S	2	%d	200	N", i, i))
+		processLine(ob, fmt.Sprintf("%d	L	S	2	%d	200	SL", i, i))
 	}
 
 	for i := 150; i < 200; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d	M	B	2	0	5	N", i))
+		processLine(ob, fmt.Sprintf("%d	M	B	2	0	5	SL", i))
 	}
 
 	for i := 200; i < 250; i = i + 10 {
-		processLine(ob, fmt.Sprintf("%d1	L	S	2	0	210	N", i))
-		processLine(ob, fmt.Sprintf("%d2	M	B	2	0	5	N", i))
+		processLine(ob, fmt.Sprintf("%d1	L	S	2	0	210	SL", i))
+		processLine(ob, fmt.Sprintf("%d2	M	B	2	0	5	SL", i))
 	}
 
 	n.Verify(t, []string{
@@ -391,15 +395,15 @@ func TestStopProcess(t *testing.T) {
 	addDepth(ob, 0)
 	n.Reset()
 
-	processLine(ob, "100	L	B	1	100	110	N")
+	processLine(ob, "100	L	B	1	100	110	SL")
 	processLine(ob, "101	M	B	2	0	0	N")
-	processLine(ob, "102	M	B	2	0	0	N")
+	processLine(ob, "102	M	B	2	0	0	N") // LP 110
 	processLine(ob, "103	M	S	2	0	0	N")
 	processLine(ob, "104	M	B	1	0	0	N")
-	processLine(ob, "105	M	B	2	0	110	N") // @ LP 120. This should trigger immediately
+	processLine(ob, "105	M	B	2	0	110	SL") // @ LP 120. This should trigger immediately
 	processLine(ob, "106	M	B	1	0	0	N")
 	processLine(ob, "107	M	S	1	0	0	N")
-	processLine(ob, "206	M	S	2	0	100	N") // @ LP 90. This should trigger immediately
+	processLine(ob, "206	M	S	2	0	100	SL") // @ LP 90. This should trigger immediately
 	processLine(ob, "207	M	S	1	0	0	N")
 
 	n.Verify(t, []string{
@@ -424,6 +428,61 @@ func TestStopProcess(t *testing.T) {
 		"4 206 FilledComplete FilledComplete 2 80",
 		"CreateOrder Accepted 207 1",
 		"3 207 FilledPartial FilledComplete 1 70",
+	})
+}
+
+func TestStopProcess_Limit(t *testing.T) {
+	n, ob := getTestOrderBook()
+	addDepth(ob, 0)
+	n.Reset()
+
+	processLine(ob, "100	M	B	1	0	0	N") // @ LP 100.
+	processLine(ob, "101	L	S	1	90	90	SL")
+	processLine(ob, "102	M	B	1	0	0	N") // @ LP 100.
+	processLine(ob, "103	M	S	2	0	0	N") // @ LP 90. SL S trigger.
+	processLine(ob, "104	M	B	1	0	0	N") // @ LP 90.
+	processLine(ob, "105	M	S	1	0	0	N")
+
+	n.Verify(t, []string{
+		"CreateOrder Accepted 100 1",
+		"6 100 FilledPartial FilledComplete 1 100",
+		"CreateOrder Accepted 101 1",
+		"CreateOrder Accepted 102 1",
+		"6 102 FilledComplete FilledComplete 1 100",
+		"CreateOrder Accepted 103 2",
+		"5 103 FilledComplete FilledComplete 2 90",
+		"CreateOrder Accepted 104 1",
+		"101 104 FilledComplete FilledComplete 1 90",
+		"CreateOrder Accepted 105 1",
+		"4 105 FilledPartial FilledComplete 1 80",
+	})
+}
+
+func TestStopProcess_Market(t *testing.T) {
+	n, ob := getTestOrderBook()
+	addDepth(ob, 0)
+	n.Reset()
+
+	processLine(ob, "100	M	B	1	0	0	N") // @ LP 100.
+	processLine(ob, "101	M	S	1	0	90	SL")
+	processLine(ob, "102	M	B	1	0	0	N") // @ LP 100.
+	processLine(ob, "103	M	S	2	0	0	N") // @ LP 90. SL S trigger. LP 80
+	processLine(ob, "104	M	B	1	0	0	N") // @ LP 110.
+	processLine(ob, "105	M	S	1	0	0	N") // @ LP 80
+
+	n.Verify(t, []string{
+		"CreateOrder Accepted 100 1",
+		"6 100 FilledPartial FilledComplete 1 100",
+		"CreateOrder Accepted 101 1",
+		"CreateOrder Accepted 102 1",
+		"6 102 FilledComplete FilledComplete 1 100",
+		"CreateOrder Accepted 103 2",
+		"5 103 FilledComplete FilledComplete 2 90",
+		"4 101 FilledPartial FilledComplete 1 80",
+		"CreateOrder Accepted 104 1",
+		"7 104 FilledPartial FilledComplete 1 110",
+		"CreateOrder Accepted 105 1",
+		"4 105 FilledComplete FilledComplete 1 80",
 	})
 }
 
@@ -457,7 +516,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 			Flag:      None,
 			Qty:       decimal.NewI(uint64(rand.Intn(1000)), 0),
 			Price:     decimal.NewI(uint64(rand.Intn(100000)), uint(rand.Intn(3))),
-			StopPrice: decimal.Zero,
+			TrigPrice: decimal.Zero,
 		}
 	}
 
@@ -467,7 +526,7 @@ func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i += 1 {
 		order := orders[rand.Intn(999_999)]
-		ob.ProcessOrder(tok, order.ID, order.Class, order.Side, order.Price, order.Qty, order.StopPrice, order.Flag) // 1 ts
+		ob.AddOrder(tok, uint64(i), order.Class, order.Side, order.Price, order.Qty, order.TrigPrice, order.Flag) // 1 ts
 		tok++
 	}
 	b.StopTimer()
