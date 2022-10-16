@@ -87,6 +87,7 @@ func (pl *priceLevel) Remove(o *Order) *Order {
 	if priceQueue.Len() == 0 {
 		pl.priceTree.Remove(price)
 		pl.depth--
+		priceQueue.Release()
 	}
 
 	pl.numOrders--
