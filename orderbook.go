@@ -266,6 +266,7 @@ func (ob *OrderBook) CancelOrder(tok, orderID uint64) {
 	}
 
 	ob.notification.PutOrder(MsgCancelOrder, Canceled, o.ID, o.Qty, nil)
+	o.Release()
 }
 
 // CancelOrder removes order with given ID from the order book
