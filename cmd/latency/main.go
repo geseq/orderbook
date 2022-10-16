@@ -46,7 +46,8 @@ func main() {
 	wg.Add(1)
 	go func() {
 		runtime.LockOSThread()
-		log.Printf("Running on thread %d", syscall.Gettid())
+		log.Printf("PID: %d", syscall.Getpid())
+		log.Printf("TID: %d", syscall.Gettid())
 		seed := flag.Int64("seed", time.Now().UnixNano(), "rand seed")
 		duration := flag.Int("duration", 0, "benchmark duration in seconds")
 		lb := flag.String("l", "50.0", "lower bound")

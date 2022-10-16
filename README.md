@@ -29,13 +29,28 @@ This is an experiment to see how far I can take the performance of a full fledge
 - [x] Extremely high throughput (see below)
 
 
+## Latency
+
+On 2.1 Ghz Base Freq 12th Gen i& with 5200 MHz LPDD5, Hyperthreading off, Turbo off
+
+- [x] AddOrder:
+  - p50:     171ns
+  - p99:     242ns
+  - p99.99:  2.8us
+  - Max:     729us
+- [x] CancelOrder:
+  - p50:     33ns
+  - p99:     49ns
+  - p99.99:  59ns
+  - Max:     202us
+
 ## Throughput
- - [x]  10 million Order Add/Cancel per second:
+ - [x] 12.5 million Order Add/Cancel per second:
    - 2.1 Ghz Base Frequency 12th Gen i7 with 5200 Mhz LPDDR5
    - Turbo Boost disbabled
    - Hyperthreading disabled
   
- - [x] 20 million Order Add/Cancel per second sustained for 1 hour on:
+ - [x] 21 million Order Add/Cancel per second:
    -   2.1 Ghz Base Frequency 12th Gen i7 with 5200 Mhz LPDDR5
    -   Turbo Boost enabled 4.7 Ghz
    -   Hyperthreading disabled
