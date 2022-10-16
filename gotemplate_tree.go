@@ -54,6 +54,24 @@ func newWithTree(comparator comparatorTree) *tree {
 	return &tree{Comparator: comparator}
 }
 
+var ntPool = NewNodeTreePool(1e6)
+
+func newNodeTree(key udecimal.Decimal, value *orderQueue, color colorTree) *nodeTree {
+	nt := ntPool.Get()
+	nt.Key = key
+	nt.Value = value
+	nt.color = color
+	nt.Left = nil
+	nt.Right = nil
+	nt.Parent = nil
+
+	return nt
+}
+
+func (n *nodeTree) Release() {
+	ntPool.Put(n)
+}
+
 // Put inserts node into the tree.
 // Key should adhere to the comparator's type assertion, otherwise method panics.
 func (tree *tree) Put(key udecimal.Decimal, value *orderQueue) {
@@ -61,7 +79,7 @@ func (tree *tree) Put(key udecimal.Decimal, value *orderQueue) {
 	if tree.Root == nil {
 		// Assert key is of comparator's type for initial tree
 		tree.Comparator(key, key)
-		tree.Root = &nodeTree{Key: key, Value: value, color: redTree}
+		tree.Root = newNodeTree(key, value, redTree)
 		insertedNode = tree.Root
 		tree.Min = tree.Root
 		tree.Max = tree.Root
@@ -77,7 +95,7 @@ func (tree *tree) Put(key udecimal.Decimal, value *orderQueue) {
 				return
 			case compare < 0:
 				if node.Left == nil {
-					node.Left = &nodeTree{Key: key, Value: value, color: redTree}
+					node.Left = newNodeTree(key, value, redTree)
 					insertedNode = node.Left
 					loop = false
 				} else {
@@ -85,7 +103,7 @@ func (tree *tree) Put(key udecimal.Decimal, value *orderQueue) {
 				}
 			case compare > 0:
 				if node.Right == nil {
-					node.Right = &nodeTree{Key: key, Value: value, color: redTree}
+					node.Right = newNodeTree(key, value, redTree)
 					insertedNode = node.Right
 					loop = false
 				} else {
@@ -163,6 +181,7 @@ func (tree *tree) Remove(key udecimal.Decimal) {
 		}
 	}
 
+	node.Release()
 	tree.size--
 }
 

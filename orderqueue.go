@@ -14,12 +14,19 @@ type orderQueue struct {
 	price    decimal.Decimal
 }
 
+// TODO: clean this up to be configurable
+var oqPool = NewOrderQueuePool(1e5)
+
 // newOrderQueue creates and initialize orderQueue object
 func newOrderQueue(price decimal.Decimal) *orderQueue {
-	return &orderQueue{
-		price:    price,
-		totalQty: decimal.Zero,
-	}
+	q := oqPool.Get()
+	q.size = 0
+	q.head = nil
+	q.tail = nil
+	q.price = price
+	q.totalQty = decimal.Zero
+
+	return q
 }
 
 // Len returns amount of orders in queue
@@ -40,6 +47,10 @@ func (oq *orderQueue) TotalQty() decimal.Decimal {
 // Head returns top order in queue
 func (oq *orderQueue) Head() *Order {
 	return oq.head
+}
+
+func (oq *orderQueue) Release() {
+	oqPool.Put(oq)
 }
 
 // Append adds order to tail of the queue
@@ -106,6 +117,7 @@ func (oq *orderQueue) process(ob *OrderBook, takerOrderID uint64, qty decimal.De
 			ob.notification.PutTrade(ho.ID, takerOrderID, FilledComplete, FilledComplete, ho.Qty, ho.Price)
 			ob.lastPrice = ho.Price
 			ordersClosed++
+			ho.Release()
 		}
 	}
 	return
