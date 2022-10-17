@@ -31,18 +31,36 @@ This is an experiment to see how far I can take the performance of a full fledge
 
 ## Latency
 
-On 2.1 Ghz Base Freq 12th Gen i& with 5200 MHz LPDD5, Hyperthreading off, Turbo off
+On 2.1 Ghz Base Freq 12th Gen i& with 5200 MHz LPDD5, Hyperthreading off, Turbo off.
 
-- [x] AddOrder:
-  - p50:     171ns
-  - p99:     242ns
-  - p99.99:  2.8us
-  - Max:     729us
-- [x] CancelOrder:
-  - p50:     33ns
-  - p99:     49ns
-  - p99.99:  59ns
-  - Max:     202us
+```
+GOMAXPROCS=2
+```
+
+Results are generally similar with test run without OS thread locking or run in a goroutine locked to an OS thread which in turn is run on an isolated CPU core.
+
+With CPU isolation on only the locked thread, there is very little effect of background processes on the latencies.
+
+Without CPU isolation latency measurements are highly sensitive to other running processes. Any background processes will create significant jitter.
+
+Other threads run by the Go scheduler don't seem to make a notable difference whether run on isolated cores or not.
+
+
+| AddOrder     | Latency (approx.)     |
+|--------------|-----------------------|
+|  p50         |  170ns                |
+|  p99         |  229ns                |
+|  p99.99      |  2.4us                |
+|  p99.9999    |  12us                 |
+|  Max         |  36us                 |
+
+| CancelOrder  | Latency (approx.)     |
+|--------------|-----------------------|
+|  p50         |  35ns                 |
+|  p99         |  50ns                 |
+|  p99.99      |  86ns                 |
+|  p99.9999    |  3.9us                |
+|  Max         |  25us                 |
 
 ## Throughput
  - [x] 12.5 million Order Add/Cancel per second:

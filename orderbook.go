@@ -176,9 +176,9 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 
 	if class == Market {
 		if side == Buy {
-			ob.asks.processMarketOrder(ob, id, quantity, flag == AoN, flag == FoK)
+			ob.asks.processMarketOrder(ob, id, quantity, flag)
 		} else {
-			ob.bids.processMarketOrder(ob, id, quantity, flag == AoN, flag == FoK)
+			ob.bids.processMarketOrder(ob, id, quantity, flag)
 		}
 
 		return
@@ -186,9 +186,9 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 
 	var qtyProcessed decimal.Decimal
 	if side == Buy {
-		qtyProcessed = ob.asks.processLimitOrder(ob, price.GreaterThanOrEqual, id, quantity, flag == AoN, flag == FoK)
+		qtyProcessed = ob.asks.processLimitOrder(ob, price.GreaterThanOrEqual, id, quantity, flag)
 	} else {
-		qtyProcessed = ob.bids.processLimitOrder(ob, price.LessThanOrEqual, id, quantity, flag == AoN, flag == FoK)
+		qtyProcessed = ob.bids.processLimitOrder(ob, price.LessThanOrEqual, id, quantity, flag)
 	}
 
 	if flag == IoC || flag == FoK {
