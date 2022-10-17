@@ -190,10 +190,10 @@ func (pl *priceLevel) GetNextQueue(price decimal.Decimal) *orderQueue {
 	}
 }
 
-func (pl *priceLevel) processMarketOrder(ob *OrderBook, takerOrderID uint64, qty decimal.Decimal, aon, fok bool) (qtyProcessed decimal.Decimal) {
+func (pl *priceLevel) processMarketOrder(ob *OrderBook, takerOrderID uint64, qty decimal.Decimal, flag FlagType) (qtyProcessed decimal.Decimal) {
 
 	// TODO: This wont work as  priceLevel volumes aren't accounted for corectly
-	if (aon || fok) && qty.GreaterThan(pl.Volume()) {
+	if flag&(AoN|FoK) != 0 && qty.GreaterThan(pl.Volume()) {
 		return decimal.Zero
 	}
 
@@ -208,14 +208,14 @@ func (pl *priceLevel) processMarketOrder(ob *OrderBook, takerOrderID uint64, qty
 	return
 }
 
-func (pl *priceLevel) processLimitOrder(ob *OrderBook, compare func(price decimal.Decimal) bool, takerOrderID uint64, qty decimal.Decimal, aon, fok bool) (qtyProcessed decimal.Decimal) {
+func (pl *priceLevel) processLimitOrder(ob *OrderBook, compare func(price decimal.Decimal) bool, takerOrderID uint64, qty decimal.Decimal, flag FlagType) (qtyProcessed decimal.Decimal) {
 	orderQueue := pl.GetQueue()
 	if orderQueue == nil || !compare(orderQueue.Price()) {
 		return
 	}
 
 	// TODO: Fix AoN
-	if aon || fok {
+	if flag&(AoN|FoK) != 0 {
 		if qty.GreaterThan(pl.Volume()) {
 			return decimal.Zero
 		}
