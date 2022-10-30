@@ -8,12 +8,9 @@ import (
 	decimal "github.com/geseq/udecimal"
 )
 
-// TODO: clean this up to be configurable
-var orderPool = NewOrderPool(1e6)
-
 // NewOrder creates new constant object Order
 func NewOrder(orderID uint64, class ClassType, side SideType, qty, price, trigPrice decimal.Decimal, flag FlagType) *Order {
-	o := orderPool.Get()
+	o := oPool.Get()
 	o.next = nil
 	o.prev = nil
 	o.queue = nil
@@ -42,7 +39,7 @@ func (o *Order) GetPrice(t PriceType) decimal.Decimal {
 }
 
 func (o *Order) Release() {
-	orderPool.Put(o)
+	oPool.Put(o)
 }
 
 // Compose converts the order to a binary representation

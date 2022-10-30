@@ -12,13 +12,13 @@ import (
 // template type ItemPool(PoolItem)
 
 // A simple order pool.
-type OrderPool struct {
+type orderPool struct {
 	ch *itemChanOrderPool
 }
 
-func NewOrderPool(maxSize uint64) *OrderPool {
+func newOrderPool(maxSize uint64) *orderPool {
 	ch := newItemChanOrderPool(maxSize)
-	p := &OrderPool{
+	p := &orderPool{
 		ch: ch,
 	}
 
@@ -29,7 +29,7 @@ func NewOrderPool(maxSize uint64) *OrderPool {
 	return p
 }
 
-func (p *OrderPool) Get() *Order {
+func (p *orderPool) Get() *Order {
 	if p.ch.IsEmpty() {
 		return &Order{}
 	}
@@ -37,7 +37,7 @@ func (p *OrderPool) Get() *Order {
 	return p.ch.Read()
 }
 
-func (p *OrderPool) Put(o *Order) {
+func (p *orderPool) Put(o *Order) {
 	if o == nil {
 		return
 	}

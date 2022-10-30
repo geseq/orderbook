@@ -12,6 +12,10 @@ type NotificationHandler interface {
 	PutTrade(makerOrderID, takerOrderID uint64, makerStatus, takerStatus OrderStatus, qty, price decimal.Decimal)
 }
 
+var oPool = newOrderPool(1)
+var ntPool = newNodeTreePool(1)
+var oqPool = newOrderQueuePool(1)
+
 // OrderBook implements standard matching algorithm
 type OrderBook struct {
 	asks         *priceLevel
@@ -28,6 +32,10 @@ type OrderBook struct {
 	lastToken uint64
 
 	matching bool
+
+	orderPoolSize      uint64
+	nodeTreePoolSize   uint64
+	orderQueuePoolSize uint64
 }
 
 // NewOrderBook creates Orderbook object
@@ -45,6 +53,10 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 
 	options(defaultOpts).applyTo(ob)
 	options(opts).applyTo(ob)
+
+	oPool = newOrderPool(ob.orderPoolSize)
+	ntPool = newNodeTreePool(ob.nodeTreePoolSize)
+	oqPool = newOrderQueuePool(ob.orderQueuePoolSize)
 
 	return ob
 }
