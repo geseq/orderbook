@@ -14,9 +14,6 @@ type orderQueue struct {
 	price    decimal.Decimal
 }
 
-// TODO: clean this up to be configurable
-var oqPool = NewOrderQueuePool(1e5)
-
 // newOrderQueue creates and initialize orderQueue object
 func newOrderQueue(price decimal.Decimal) *orderQueue {
 	q := oqPool.Get()
