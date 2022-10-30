@@ -15,7 +15,7 @@ type orderQueue struct {
 }
 
 // TODO: clean this up to be configurable
-var oqPool = NewOrderQueuePool(1e5)
+var oqPool = newOrderQueuePool(1e5)
 
 // newOrderQueue creates and initialize orderQueue object
 func newOrderQueue(price decimal.Decimal) *orderQueue {
