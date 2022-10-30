@@ -54,8 +54,6 @@ func newWithTree(comparator comparatorTree) *tree {
 	return &tree{Comparator: comparator}
 }
 
-var ntPool = newNodeTreePool(1e6)
-
 func newNodeTree(key udecimal.Decimal, value *orderQueue, color colorTree) *nodeTree {
 	nt := ntPool.Get()
 	nt.Key = key
