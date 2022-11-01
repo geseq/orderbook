@@ -188,6 +188,8 @@ func getOrderBook() *orderbook.OrderBook {
 	on := &EmptyNotification{}
 	ob := orderbook.NewOrderBook(on)
 
+	runtime.GC()
+	runtime.Gosched()
 	return ob
 }
 
