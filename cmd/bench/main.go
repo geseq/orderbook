@@ -26,6 +26,7 @@ func main() {
 	ms := flag.String("m", "0.25", "min spread")
 	pd := flag.Int("p", 10, "print duration in seconds")
 	gc := flag.Bool("gc", true, "use gc")
+	sched := flag.Bool("sched", true, "introduce runtime.Gosched() between calls")
 	n := flag.String("n", "latency", "bench name (latency/throughput)")
 	t := flag.Bool("t", false, "run in thread")
 	flag.Parse()
@@ -36,7 +37,7 @@ func main() {
 
 	log.Printf("PID: %d", syscall.Getpid())
 	if !*t {
-		run(*seed, *duration, *pd, *startAfter, *lb, *ub, *ms, *n)
+		run(*seed, *duration, *pd, *startAfter, *lb, *ub, *ms, *n, *sched)
 		return
 	}
 
@@ -46,14 +47,14 @@ func main() {
 		runtime.LockOSThread()
 		log.Printf("TID: %d", syscall.Gettid())
 
-		run(*seed, *duration, *pd, *startAfter, *lb, *ub, *ms, *n)
+		run(*seed, *duration, *pd, *startAfter, *lb, *ub, *ms, *n, *sched)
 		wg.Done()
 	}()
 
 	wg.Wait()
 }
 
-func run(seed int64, duration, pd int, startAfter uint64, lb, ub, ms, n string) {
+func run(seed int64, duration, pd int, startAfter uint64, lb, ub, ms, n string, sched bool) {
 	if startAfter > 0 {
 		<-time.After(time.Duration(startAfter) * time.Second)
 	}
@@ -67,11 +68,11 @@ func run(seed int64, duration, pd int, startAfter uint64, lb, ub, ms, n string) 
 	case "throughput":
 		throughput(duration, pd, seed, lowerBound, upperBound, minSpread)
 	case "latency":
-		latency(duration, pd, seed, lowerBound, upperBound, minSpread)
+		latency(duration, pd, seed, lowerBound, upperBound, minSpread, sched)
 	}
 }
 
-func latency(duration, printDuration int, seed int64, lowerBound, upperBound, minSpread decimal.Decimal) {
+func latency(duration, printDuration int, seed int64, lowerBound, upperBound, minSpread decimal.Decimal, sched bool) {
 	ah := stats.NewHistogram(10, 1)
 	ch := stats.NewHistogram(10, 1)
 	ob := getOrderBook()
@@ -101,10 +102,18 @@ func latency(duration, printDuration int, seed int64, lowerBound, upperBound, mi
 		}
 
 		tok = tok + 1
+
+		if sched {
+			runtime.Gosched()
+		}
 		s := hrtime.TSC()
 		ob.CancelOrder(tok, buyID)
 		ch.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
 		tok = tok + 1
+
+		if sched {
+			runtime.Gosched()
+		}
 		s = hrtime.TSC()
 		ob.CancelOrder(tok, sellID)
 		ch.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
@@ -112,12 +121,26 @@ func latency(duration, printDuration int, seed int64, lowerBound, upperBound, mi
 		buyID = tok
 		tok = tok + 1
 		sellID = tok
+
+		if sched {
+			runtime.Gosched()
+		}
+
 		s = hrtime.TSC()
 		ob.AddOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
 		ah.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
+
+		if sched {
+			runtime.Gosched()
+		}
+
 		s = hrtime.TSC()
 		ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
 		ah.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
+
+		if sched {
+			runtime.Gosched()
+		}
 	}
 
 	ah.Print(os.Stdout, "Add Results", []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.9999, 100})
