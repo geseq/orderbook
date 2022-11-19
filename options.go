@@ -15,6 +15,7 @@ var defaultOpts = []Option{
 	WithMatching(true),
 	WithOrderPoolSize(1e6),
 	WithNodeTreePoolSize(1e6),
+	WithOrderTreeNodePoolSIze(1e6),
 	WithOrderQueuePoolSize(1e5),
 }
 
@@ -31,6 +32,11 @@ func WithOrderPoolSize(size uint64) Option {
 // WithNodeTreePoolSize sets the size of the node tree pool
 func WithNodeTreePoolSize(size uint64) Option {
 	return func(o *OrderBook) { o.nodeTreePoolSize = size }
+}
+
+// WithOrderTreeNodePoolSize sets the size of the order tree node pool
+func WithOrderTreeNodePoolSIze(size uint64) Option {
+	return func(o *OrderBook) { o.orderTreeNodePoolSize = size }
 }
 
 // WithOrderQueuePoolSize sets the size of the order queue pool
