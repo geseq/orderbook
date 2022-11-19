@@ -2,14 +2,12 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -80,7 +78,6 @@ func latency(duration, printDuration int, seed int64, lowerBound, upperBound, mi
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
 
 	var tok, buyID, sellID uint64
-	var ops uint64
 
 	rand := rand.New(rand.NewSource(seed))
 
@@ -90,9 +87,8 @@ func latency(duration, printDuration int, seed int64, lowerBound, upperBound, mi
 	c = hrtime.TSC()
 	log.Println(hrtime.TSCSince(c).ApproxDuration())
 
-	start := time.Now()
 	end := time.Now().Add(time.Duration(duration) * time.Second)
-	var diff uint64
+
 	for time.Now().Before(end) {
 		var r = rand.Intn(10)
 		dec := r < 5
@@ -104,7 +100,6 @@ func latency(duration, printDuration int, seed int64, lowerBound, upperBound, mi
 			bid, ask = getPrice(bid, ask, minSpread, true)
 		}
 
-		ds := hrtime.TSC()
 		tok = tok + 1
 		s := hrtime.TSC()
 		ob.CancelOrder(tok, buyID)
@@ -123,20 +118,10 @@ func latency(duration, printDuration int, seed int64, lowerBound, upperBound, mi
 		s = hrtime.TSC()
 		ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
 		ah.Record(float64(hrtime.TSCSince(s).ApproxDuration()))
-		diff += uint64(hrtime.TSCSince(ds).ApproxDuration())
-		atomic.AddUint64(&ops, 4) // 4 cancels and adds
-
-		if uint64(time.Now().Sub(start).Seconds()) > uint64(printDuration) {
-			fmt.Printf("ops/s: %d\n", ops/uint64(diff/1000_000_000))
-			ops = 0
-			start = time.Now()
-			diff = 0
-		}
 	}
 
 	ah.Print(os.Stdout, "Add Results", []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.9999, 100})
 	ch.Print(os.Stdout, "Cancel Results", []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.9999, 100})
-
 }
 
 func throughput(duration, printDuration int, seed int64, lowerBound, upperBound, minSpread decimal.Decimal) {
@@ -144,11 +129,8 @@ func throughput(duration, printDuration int, seed int64, lowerBound, upperBound,
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
 
 	var tok, buyID, sellID uint64
-	var ops uint64
 
-	start := time.Now()
 	end := time.Now().Add(time.Duration(duration) * time.Second)
-	var diff uint64
 	for time.Now().Before(end) {
 		var r = rand.Intn(10)
 		dec := r < 5
@@ -160,7 +142,6 @@ func throughput(duration, printDuration int, seed int64, lowerBound, upperBound,
 			bid, ask = getPrice(bid, ask, minSpread, true)
 		}
 
-		ds := time.Now()
 		tok = tok + 1
 		ob.CancelOrder(tok, buyID)
 		tok = tok + 1
@@ -171,17 +152,7 @@ func throughput(duration, printDuration int, seed int64, lowerBound, upperBound,
 		sellID = tok
 		ob.AddOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
 		ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
-		diff += uint64(time.Now().Sub(ds))
-		atomic.AddUint64(&ops, 4) // 4 cancels and adds
-
-		if uint64(time.Now().Sub(start).Seconds()) > uint64(printDuration) {
-			fmt.Printf("ops/s: %d\n", ops/uint64(diff/1000_000_000))
-			ops = 0
-			start = time.Now()
-			diff = 0
-		}
 	}
-
 }
 
 func getOrderBook() *orderbook.OrderBook {
