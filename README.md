@@ -41,22 +41,24 @@ Other threads run by the Go scheduler don't seem to make a notable difference wh
 
 The `nohz_full` column represents tests run with `GOMAXPROCS=1` on a `nohz_full` isolated core on a `-generic` ubuntu kernel compiled with `nohz_full` and all possible IRQs moved out of that core. The primary thread was pinned to this isolated core and all other threads were left on non-isolated cores.
 
+The `sched_manual` column represents the settings of `nohz_full` mentioned above along with calls to `runtime.Gosched()` before and after the calls being benchmarked. This is because majority of the large latency spikes seems to be introduced due to the Go scheduler pauses in between the runs. I have not found a way to get rid of these. Running `Gosched()` seems to mitigate these to the point where pinning goroutine to a thread introduces significant stabilitizing of the jitter. However, this comes at about 10% cost to the throughput, and *incrased latencies at p50/o90* due to increased context switching which in matching engines might be an acceptable tradeoff for reduced jitter.
 
-| AddOrder     | Latency (approx.)     | nohz_full          |
-|--------------|-----------------------|--------------------|
-|  p50         |  170ns                |  164ns             |
-|  p99         |  229ns                |  256ns             |
-|  p99.99      |  2.4us                |  2.3us             |
-|  p99.9999    |  12us                 |  6.5us             |
-|  Max         |  36us                 |  15us              |
 
-| CancelOrder  | Latency (approx.)     | nohz_full          |
-|--------------|-----------------------|--------------------|
-|  p50         |  35ns                 |  33ns              |
-|  p99         |  50ns                 |  50ns              |
-|  p99.99      |  86ns                 |  60ns              |
-|  p99.9999    |  3.9us                |  3.1us             |
-|  Max         |  25us                 |  6.8us             |
+| AddOrder     | Latency (approx.)     | nohz_full          | sched_manual       |
+|--------------|-----------------------|--------------------|--------------------|
+|  p50         |  170ns                |  164ns             |  546ns             |
+|  p99         |  229ns                |  256ns             |  735ns             |
+|  p99.99      |  2.4us                |  2.3us             |  2.4us             |
+|  p99.9999    |  12us                 |  6.5us             |  7.9us             |
+|  Max         |  36us                 |  15us              |  8.5us             |
+                                                                                  
+| CancelOrder  | Latency (approx.)     | nohz_full          | sched_manual       |
+|--------------|-----------------------|--------------------|--------------------|
+|  p50         |  35ns                 |  33ns              |  50ns              |
+|  p99         |  50ns                 |  50ns              |  59ns              |
+|  p99.99      |  86ns                 |  60ns              |  165ns             |
+|  p99.9999    |  3.9us                |  3.1us             |  1.9us             |
+|  Max         |  25us                 |  6.8us             |  1.9us             |
 
 ## Throughput
  - [x] 12.5 million Order Add/Cancel per second:
