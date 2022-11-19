@@ -11,10 +11,6 @@ import (
 // NewOrder creates new constant object Order
 func NewOrder(orderID uint64, class ClassType, side SideType, qty, price, trigPrice decimal.Decimal, flag FlagType) *Order {
 	o := oPool.Get()
-	o.next = nil
-	o.prev = nil
-	o.queue = nil
-
 	if class == Market {
 		price = decimal.Zero
 	}
@@ -39,6 +35,17 @@ func (o *Order) GetPrice(t PriceType) decimal.Decimal {
 }
 
 func (o *Order) Release() {
+	o.next = nil
+	o.prev = nil
+	o.queue = nil
+	o.ID = 0
+	o.Class = 0
+	o.Side = 0
+	o.Flag = 0
+	o.Qty = decimal.Zero
+	o.Price = decimal.Zero
+	o.TrigPrice = decimal.Zero
+
 	oPool.Put(o)
 }
 

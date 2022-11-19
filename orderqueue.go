@@ -107,6 +107,7 @@ func (oq *orderQueue) process(ob *OrderBook, takerOrderID uint64, qty decimal.De
 			ob.notification.PutTrade(ho.ID, takerOrderID, FilledComplete, FilledPartial, ho.Qty, ho.Price)
 			ob.lastPrice = ho.Price
 			ordersClosed++
+			ho.Release()
 		case 0:
 			qtyProcessed = qtyProcessed.Add(ho.Qty)
 			qty = qty.Sub(ho.Qty)
