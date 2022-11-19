@@ -6,6 +6,8 @@ import (
 	decimal "github.com/geseq/udecimal"
 )
 
+//go:generate gotemplate "github.com/geseq/redblacktree" tree(uint64,*Order)
+
 // NotificationHandler handles notification updates
 type NotificationHandler interface {
 	PutOrder(m MsgType, s OrderStatus, orderID uint64, qty decimal.Decimal, err error)
@@ -176,15 +178,16 @@ func (ob *OrderBook) addTrigOrder(id uint64, class ClassType, side SideType, qua
 	}
 }
 
+func (ob *OrderBook) postProcess(lp decimal.Decimal) {
+	if lp == ob.lastPrice {
+		return
+	}
+	ob.queueTriggeredOrders()
+	ob.processTriggeredOrders()
+}
+
 func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, quantity, price decimal.Decimal, flag FlagType) {
 	lp := ob.lastPrice
-	defer func() {
-		if lp == ob.lastPrice {
-			return
-		}
-		ob.queueTriggeredOrders()
-		ob.processTriggeredOrders()
-	}()
 
 	if class == Market {
 		if side == Buy {
@@ -193,6 +196,7 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 			ob.bids.processMarketOrder(ob, id, quantity, flag)
 		}
 
+		ob.postProcess(lp)
 		return
 	}
 
@@ -204,6 +208,7 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 	}
 
 	if flag == IoC || flag == FoK {
+		ob.postProcess(lp)
 		return
 	}
 
@@ -217,6 +222,7 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 		}
 	}
 
+	ob.postProcess(lp)
 	return
 }
 
