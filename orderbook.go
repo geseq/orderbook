@@ -6,6 +6,8 @@ import (
 	decimal "github.com/geseq/udecimal"
 )
 
+//go:generate gotemplate "github.com/geseq/redblacktree" orderTree(uint64,*Order)
+
 // NotificationHandler handles notification updates
 type NotificationHandler interface {
 	PutOrder(m MsgType, s OrderStatus, orderID uint64, qty decimal.Decimal, err error)
@@ -14,16 +16,17 @@ type NotificationHandler interface {
 
 var oPool = newOrderPool(1)
 var ntPool = newNodeTreePool(1)
+var notPool = newOrderTreeNodePool(1)
 var oqPool = newOrderQueuePool(1)
 
 // OrderBook implements standard matching algorithm
 type OrderBook struct {
 	asks         *priceLevel
 	bids         *priceLevel
-	triggerUnder *priceLevel       // orders triggering under last price i.e. Stop Sell or Take Buy
-	triggerOver  *priceLevel       // orders that trigger over last price i.e. Stop Buy or Take Sell
-	orders       map[uint64]*Order // orderId -> *Order
-	trigOrders   map[uint64]*Order // orderId -> *Order
+	triggerUnder *priceLevel // orders triggering under last price i.e. Stop Sell or Take Buy
+	triggerOver  *priceLevel // orders that trigger over last price i.e. Stop Buy or Take Sell
+	orders       *orderTree  // orderId -> *Order
+	trigOrders   *orderTree  // orderId -> *Order
 	trigQueue    *triggerQueue
 
 	notification NotificationHandler
@@ -33,16 +36,28 @@ type OrderBook struct {
 
 	matching bool
 
-	orderPoolSize      uint64
-	nodeTreePoolSize   uint64
-	orderQueuePoolSize uint64
+	orderPoolSize         uint64
+	nodeTreePoolSize      uint64
+	orderTreeNodePoolSize uint64
+	orderQueuePoolSize    uint64
+}
+
+// Uint64Cmp compares two uint64.
+func Uint64Cmp(a, b uint64) int {
+	if a == b {
+		return 0
+	}
+	if a < b {
+		return -1
+	}
+	return 1
 }
 
 // NewOrderBook creates Orderbook object
 func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 	ob := &OrderBook{
-		orders:       map[uint64]*Order{},
-		trigOrders:   map[uint64]*Order{},
+		orders:       newWithOrderTree(Uint64Cmp),
+		trigOrders:   newWithOrderTree(Uint64Cmp),
 		trigQueue:    newTriggerQueue(),
 		bids:         newPriceLevel(BidPrice),
 		asks:         newPriceLevel(AskPrice),
@@ -56,6 +71,7 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 
 	oPool = newOrderPool(ob.orderPoolSize)
 	ntPool = newNodeTreePool(ob.nodeTreePoolSize)
+	notPool = newOrderTreeNodePool(ob.orderTreeNodePoolSize)
 	oqPool = newOrderQueuePool(ob.orderQueuePoolSize)
 
 	return ob
@@ -116,7 +132,7 @@ func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, qu
 	}
 
 	if class != Market {
-		if _, ok := ob.orders[id]; ok {
+		if _, ok := ob.orders.Get(id); ok {
 			ob.notification.PutOrder(MsgCreateOrder, Rejected, id, decimal.Zero, ErrOrderExists)
 			return
 		}
@@ -144,7 +160,7 @@ func (ob *OrderBook) addTrigOrder(id uint64, class ClassType, side SideType, qua
 				return
 			}
 
-			ob.trigOrders[id] = ob.triggerOver.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+			ob.trigOrders.Put(id, ob.triggerOver.Append(NewOrder(id, class, side, quantity, price, stPrice, flag)))
 		case Sell:
 			if ob.lastPrice.LessThanOrEqual(stPrice) {
 				// Stop sell set over stop price, condition satisfied to trigger
@@ -152,7 +168,7 @@ func (ob *OrderBook) addTrigOrder(id uint64, class ClassType, side SideType, qua
 				return
 			}
 
-			ob.trigOrders[id] = ob.triggerUnder.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+			ob.trigOrders.Put(id, ob.triggerUnder.Append(NewOrder(id, class, side, quantity, price, stPrice, flag)))
 		}
 	case TakeProfit:
 		switch side {
@@ -163,7 +179,7 @@ func (ob *OrderBook) addTrigOrder(id uint64, class ClassType, side SideType, qua
 				return
 			}
 
-			ob.trigOrders[id] = ob.triggerUnder.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+			ob.trigOrders.Put(id, ob.triggerUnder.Append(NewOrder(id, class, side, quantity, price, stPrice, flag)))
 		case Sell:
 			if stPrice.LessThanOrEqual(ob.lastPrice) {
 				// Stop sell set over stop price, condition satisfied to trigger
@@ -171,20 +187,21 @@ func (ob *OrderBook) addTrigOrder(id uint64, class ClassType, side SideType, qua
 				return
 			}
 
-			ob.trigOrders[id] = ob.triggerOver.Append(NewOrder(id, class, side, quantity, price, stPrice, flag))
+			ob.trigOrders.Put(id, ob.triggerOver.Append(NewOrder(id, class, side, quantity, price, stPrice, flag)))
 		}
 	}
 }
 
+func (ob *OrderBook) postProcess(lp decimal.Decimal) {
+	if lp == ob.lastPrice {
+		return
+	}
+	ob.queueTriggeredOrders()
+	ob.processTriggeredOrders()
+}
+
 func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, quantity, price decimal.Decimal, flag FlagType) {
 	lp := ob.lastPrice
-	defer func() {
-		if lp == ob.lastPrice {
-			return
-		}
-		ob.queueTriggeredOrders()
-		ob.processTriggeredOrders()
-	}()
 
 	if class == Market {
 		if side == Buy {
@@ -193,6 +210,7 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 			ob.bids.processMarketOrder(ob, id, quantity, flag)
 		}
 
+		ob.postProcess(lp)
 		return
 	}
 
@@ -204,6 +222,7 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 	}
 
 	if flag == IoC || flag == FoK {
+		ob.postProcess(lp)
 		return
 	}
 
@@ -211,12 +230,13 @@ func (ob *OrderBook) processOrder(id uint64, class ClassType, side SideType, qua
 	if quantityLeft.GreaterThan(decimal.Zero) {
 		o := NewOrder(id, class, side, quantityLeft, price, decimal.Zero, flag)
 		if side == Buy {
-			ob.orders[id] = ob.bids.Append(o)
+			ob.orders.Put(id, ob.bids.Append(o))
 		} else {
-			ob.orders[id] = ob.asks.Append(o)
+			ob.orders.Put(id, ob.asks.Append(o))
 		}
 	}
 
+	ob.postProcess(lp)
 	return
 }
 
@@ -252,9 +272,9 @@ func (ob *OrderBook) processTriggeredOrders() {
 
 // Order returns order by id
 func (ob *OrderBook) Order(orderID uint64) *Order {
-	o, ok := ob.orders[orderID]
+	o, ok := ob.orders.Get(orderID)
 	if !ok {
-		o, ok := ob.trigOrders[orderID]
+		o, ok := ob.trigOrders.Get(orderID)
 		if !ok {
 			return nil
 		}
@@ -283,12 +303,12 @@ func (ob *OrderBook) CancelOrder(tok, orderID uint64) {
 
 // CancelOrder removes order with given ID from the order book
 func (ob *OrderBook) cancelOrder(orderID uint64) *Order {
-	o, ok := ob.orders[orderID]
+	o, ok := ob.orders.Get(orderID)
 	if !ok {
 		return ob.cancelTrigOrders(orderID)
 	}
 
-	delete(ob.orders, orderID)
+	ob.orders.Remove(orderID)
 
 	if o.Side == Buy {
 		return ob.bids.Remove(o)
@@ -298,12 +318,12 @@ func (ob *OrderBook) cancelOrder(orderID uint64) *Order {
 }
 
 func (ob *OrderBook) cancelTrigOrders(orderID uint64) *Order {
-	o, ok := ob.trigOrders[orderID]
+	o, ok := ob.trigOrders.Get(orderID)
 	if !ok {
 		return nil
 	}
 
-	delete(ob.trigOrders, orderID)
+	ob.trigOrders.Remove(orderID)
 
 	if (o.Flag & StopLoss) != 0 {
 		if o.Side == Buy {
