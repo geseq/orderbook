@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -154,6 +155,8 @@ func throughput(duration, printDuration int, seed int64, lowerBound, upperBound,
 	var tok, buyID, sellID uint64
 
 	end := time.Now().Add(time.Duration(duration) * time.Second)
+	var dur time.Duration
+	count := 0
 	for time.Now().Before(end) {
 		var r = rand.Intn(10)
 		dec := r < 5
@@ -173,9 +176,14 @@ func throughput(duration, printDuration int, seed int64, lowerBound, upperBound,
 		buyID = tok
 		tok = tok + 1
 		sellID = tok
+		s := hrtime.TSC()
 		ob.AddOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
 		ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
+		dur += hrtime.TSCSince(s).ApproxDuration()
+		count += 4
 	}
+
+	fmt.Println("Throughput /s: ", count/int(dur.Seconds()))
 }
 
 func getOrderBook() *orderbook.OrderBook {
