@@ -405,6 +405,7 @@ func TestStopProcess(t *testing.T) {
 	processLine(ob, "107	M	S	1	0	0	N")
 	processLine(ob, "206	M	S	2	0	100	SL") // @ LP 90. This should trigger immediately
 	processLine(ob, "207	M	S	1	0	0	N")
+	processLine(ob, "208	L	S	1	100	0	SL")
 
 	n.Verify(t, []string{
 		"CreateOrder Accepted 100 1",
@@ -428,6 +429,7 @@ func TestStopProcess(t *testing.T) {
 		"4 206 FilledComplete FilledComplete 2 80",
 		"CreateOrder Accepted 207 1",
 		"3 207 FilledPartial FilledComplete 1 70",
+		"CreateOrder Rejected 208 1 ErrInvalidTriggerPrice",
 	})
 }
 
@@ -569,6 +571,8 @@ func (o orderNotification) String() string {
 			errName = "ErrInsufficientQuantity"
 		case ErrNoMatching:
 			errName = "ErrNoMatching"
+		case ErrInvalidTriggerPrice:
+			errName = "ErrInvalidTriggerPrice"
 		}
 
 		return fmt.Sprintf("%s %s %d %s %s", o.MsgType, o.Status, o.OrderID, o.Qty.String(), errName)
