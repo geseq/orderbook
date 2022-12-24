@@ -108,6 +108,7 @@ func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, qu
 	if flag&(StopLoss|TakeProfit) != 0 {
 		if trigPrice.IsZero() {
 			ob.notification.PutOrder(MsgCreateOrder, Rejected, id, quantity, ErrInvalidTriggerPrice)
+			return
 		}
 
 		ob.notification.PutOrder(MsgCreateOrder, Accepted, id, quantity, nil)
