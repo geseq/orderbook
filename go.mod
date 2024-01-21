@@ -8,6 +8,7 @@ require (
 	github.com/loov/hrtime v1.0.3
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8
+	golang.org/x/text v0.3.7
 )
 
 require (
