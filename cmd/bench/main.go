@@ -15,6 +15,8 @@ import (
 	"github.com/geseq/orderbook"
 	decimal "github.com/geseq/udecimal"
 	"github.com/loov/hrtime"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 func main() {
@@ -152,8 +154,10 @@ func throughput(duration, printDuration int, seed int64, lowerBound, upperBound,
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
 
 	var tok, buyID, sellID uint64
+	var operations int
 
 	end := time.Now().Add(time.Duration(duration) * time.Second)
+	start := time.Now()
 	for time.Now().Before(end) {
 		var r = rand.Intn(10)
 		dec := r < 5
@@ -175,7 +179,18 @@ func throughput(duration, printDuration int, seed int64, lowerBound, upperBound,
 		sellID = tok
 		ob.AddOrder(buyID, buyID, orderbook.Limit, orderbook.Buy, bidQty, bid, decimal.Zero, orderbook.None)
 		ob.AddOrder(sellID, sellID, orderbook.Limit, orderbook.Sell, askQty, ask, decimal.Zero, orderbook.None)
+		operations += 4 // 2 cancels + 2 adds
 	}
+
+	finish := time.Now()
+	elapsed := finish.Sub(start)
+	throughput := float64(operations) / elapsed.Seconds()
+	nanosecPerOp := float64(elapsed.Nanoseconds()) / float64(operations)
+
+	p := message.NewPrinter(language.English)
+	p.Printf("Total Ops: %d ops\n", operations)
+	p.Printf("Throughput: %.2f ops/sec\n", throughput)
+	p.Printf("Avg latency: %.2f ns/op\n", nanosecPerOp)
 }
 
 func getOrderBook() *orderbook.OrderBook {

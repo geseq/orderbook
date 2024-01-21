@@ -1,0 +1,13 @@
+version: '2.2'
+services:
+  bench:
+    build: .
+    container_name: bench
+    cpus: 1
+    cpuset: "1"
+    environment:
+      GOMAXPROCS: 1
+    command:
+      - "-duration=30"
+      - "-start-after=60"
+      - "-n=throughput"
