@@ -79,15 +79,16 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 
 // AddOrder places new order to the OrderBook
 // Arguments:
-//      orderID   - unique order ID in depth (uint64)
-//      class     - what class of order do you want to place (ob.Market or ob.Limit)
-//      side      - what do you want to do (ob.Sell or ob.Buy)
-//      quantity  - how much quantity you want to sell or buy (decimal)
-//      price     - no more expensive (or cheaper) this price (decimal)
-//      trigPrice - create a stop/take order until market price reaches this price (decimal)
-//      flag      - immediate or cancel, all or none, fill or kill, Cancel (ob.IoC or ob.AoN or ob.FoK or ob.Cancel)
-//      * to create new decimal number you should use udecimal.New() func
-//        read more at https://github.com/geseq/udecimal
+//
+//	orderID   - unique order ID in depth (uint64)
+//	class     - what class of order do you want to place (ob.Market or ob.Limit)
+//	side      - what do you want to do (ob.Sell or ob.Buy)
+//	quantity  - how much quantity you want to sell or buy (decimal)
+//	price     - no more expensive (or cheaper) this price (decimal)
+//	trigPrice - create a stop/take order until market price reaches this price (decimal)
+//	flag      - immediate or cancel, all or none, fill or kill, Cancel (ob.IoC or ob.AoN or ob.FoK or ob.Cancel)
+//	* to create new decimal number you should use udecimal.New() func
+//	  read more at https://github.com/geseq/udecimal
 func (ob *OrderBook) AddOrder(tok, id uint64, class ClassType, side SideType, quantity, price, trigPrice decimal.Decimal, flag FlagType) {
 	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
 		panic("invalid token received: cannot maintain determinism")
@@ -337,4 +338,67 @@ func (ob *OrderBook) cancelTrigOrders(orderID uint64) *Order {
 		return ob.triggerUnder.Remove(o)
 	}
 	return ob.triggerOver.Remove(o)
+}
+
+// Ask returns the best (lowest priced) sell order (Ask) from the order book.
+// It compares and swaps the `lastToken` to ensure that the provided token is correct
+// and maintains deterministic behavior during the execution of the order matching.
+//
+// Parameters:
+//   - tok: A unique token (uint64) used for deterministic order matching. The method
+//     uses atomic operations to ensure that the token is updated correctly.
+//
+// Returns:
+//   - *Order: The lowest-priced sell order (Ask) in the order book. If there are no
+//     sell orders, the method returns nil.
+//
+// The method works as follows:
+//  1. It uses `CompareAndSwapUint64` to check and update the last token, ensuring
+//     that the token follows the expected order and is correctly managed.
+//  2. It retrieves the `MinPriceQueue`, which represents the price level with the
+//     lowest Ask (sell) orders.
+//  3. It returns the first order in that queue using `Head()`.
+//  4. If there are no orders, it returns `nil`.
+func (ob *OrderBook) Ask(tok uint64) *Order {
+	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
+		panic("invalid token received: cannot maintain determinism")
+	}
+	orderQueue := ob.asks.MinPriceQueue()
+	if orderQueue == nil {
+		return nil
+	}
+
+	return orderQueue.Head()
+}
+
+// Bid returns the best (highest priced) buy order (Bid) from the order book.
+// Similar to `Ask()`, it uses atomic operations to ensure that the provided token
+// is correct and ensures deterministic order processing.
+//
+// Parameters:
+//   - tok: A unique token (uint64) used for deterministic order matching. The method
+//     ensures the token is valid and uses atomic operations to update the token
+//     correctly during execution.
+//
+// Returns:
+//   - *Order: The highest-priced buy order (Bid) in the order book. If there are no
+//     buy orders, the method returns nil.
+//
+// The method works as follows:
+//  1. It uses `CompareAndSwapUint64` to ensure that the token is correct and
+//     maintains order-matching determinism.
+//  2. It retrieves the `MaxPriceQueue`, which represents the price level with the
+//     highest Bid (buy) orders.
+//  3. It returns the first order in that queue using `Head()`.
+//  4. If there are no buy orders, it returns `nil`.
+func (ob *OrderBook) Bid(tok uint64) *Order {
+	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
+		panic("invalid token received: cannot maintain determinism")
+	}
+	orderQueue := ob.bids.MaxPriceQueue()
+	if orderQueue == nil {
+		return nil
+	}
+
+	return orderQueue.Head()
 }
