@@ -488,6 +488,170 @@ func TestStopProcess_Market(t *testing.T) {
 	})
 }
 
+func TestOrderBook_Ask(t *testing.T) {
+	n, ob := getTestOrderBook()
+	n.Reset()
+
+	processLine(ob, "1	L	S	1	100	0	N") // Best Ask order
+	processLine(ob, "2	L	S	2	110	0	N")
+	processLine(ob, "3	L	S	3	120	0	N")
+	processLine(ob, "4	L	S	1	130	0	N")
+
+	bestAsk := ob.Ask(tok)
+	tok++
+	require.NotNil(t, bestAsk, "Expected best ask order to be non-nil")
+	assert.Equal(t, decimal.New(100, 0), bestAsk.Price, "Expected best ask price to be 100")
+	assert.Equal(t, uint64(1), bestAsk.ID, "Expected best ask order ID to be 1")
+
+	n.Verify(t, []string{
+		"CreateOrder Accepted 1 1",
+		"CreateOrder Accepted 2 2",
+		"CreateOrder Accepted 3 3",
+		"CreateOrder Accepted 4 1",
+	})
+	n.Reset()
+
+	ob.CancelOrder(tok, bestAsk.ID)
+	tok++
+
+	bestAsk = ob.Ask(tok)
+	tok++
+	require.NotNil(t, bestAsk, "Expected best ask order to be non-nil after canceling the first one")
+	assert.Equal(t, decimal.New(110, 0), bestAsk.Price, "Expected best ask price to be 110 after cancellation")
+	assert.Equal(t, uint64(2), bestAsk.ID, "Expected best ask order ID to be 2 after cancellation")
+	n.Verify(t, []string{
+		"CancelOrder Canceled 1 1",
+	})
+
+	ob.CancelOrder(tok, 2)
+	tok++
+	ob.CancelOrder(tok, 3)
+	tok++
+	ob.CancelOrder(tok, 4)
+	tok++
+
+	assert.Nil(t, ob.Ask(tok), "Expected Ask to return nil after all sell orders are canceled")
+	tok++
+	n.Verify(t, []string{
+		"CancelOrder Canceled 1 1",
+		"CancelOrder Canceled 2 2",
+		"CancelOrder Canceled 3 3",
+		"CancelOrder Canceled 4 1",
+	})
+}
+
+func TestOrderBook_Bid(t *testing.T) {
+	n, ob := getTestOrderBook()
+	n.Reset()
+
+	processLine(ob, "1	L	B	1	100	0	N") // Best Bid order
+	processLine(ob, "2	L	B	2	90	0	N")
+	processLine(ob, "3	L	B	3	80	0	N")
+	processLine(ob, "4	L	B	1	70	0	N")
+
+	bestBid := ob.Bid(tok)
+	tok++
+	require.NotNil(t, bestBid, "Expected best bid order to be non-nil")
+	assert.Equal(t, decimal.New(100, 0), bestBid.Price, "Expected best bid price to be 100")
+	assert.Equal(t, uint64(1), bestBid.ID, "Expected best bid order ID to be 1")
+	n.Verify(t, []string{
+		"CreateOrder Accepted 1 1",
+		"CreateOrder Accepted 2 2",
+		"CreateOrder Accepted 3 3",
+		"CreateOrder Accepted 4 1",
+	})
+	n.Reset()
+
+	ob.CancelOrder(tok, bestBid.ID)
+	tok++
+
+	bestBid = ob.Bid(tok)
+	tok++
+	require.NotNil(t, bestBid, "Expected best bid order to be non-nil after canceling the first one")
+	assert.Equal(t, decimal.New(90, 0), bestBid.Price, "Expected best bid price to be 90 after cancellation")
+	assert.Equal(t, uint64(2), bestBid.ID, "Expected best bid order ID to be 2 after cancellation")
+	n.Verify(t, []string{
+		"CancelOrder Canceled 1 1",
+	})
+
+	ob.CancelOrder(tok, 2)
+	tok++
+	ob.CancelOrder(tok, 3)
+	tok++
+	ob.CancelOrder(tok, 4)
+	tok++
+
+	assert.Nil(t, ob.Bid(tok), "Expected Bid to return nil after all buy orders are canceled")
+	tok++
+	n.Verify(t, []string{
+		"CancelOrder Canceled 1 1",
+		"CancelOrder Canceled 2 2",
+		"CancelOrder Canceled 3 3",
+		"CancelOrder Canceled 4 1",
+	})
+}
+
+func TestOrderBook_BidAndAsk(t *testing.T) {
+	n, ob := getTestOrderBook()
+	n.Reset()
+
+	processLine(ob, "1	L	B	1	100	0	N") // Best Bid order
+	processLine(ob, "2	L	B	2	90	0	N")
+	processLine(ob, "3	L	S	1	110	0	N") // Best Ask order
+	processLine(ob, "4	L	S	2	120	0	N")
+
+	bestBid := ob.Bid(tok)
+	tok++
+	require.NotNil(t, bestBid, "Expected best bid order to be non-nil")
+	assert.Equal(t, decimal.New(100, 0), bestBid.Price, "Expected best bid price to be 100")
+	assert.Equal(t, uint64(1), bestBid.ID, "Expected best bid order ID to be 1")
+
+	bestAsk := ob.Ask(tok)
+	tok++
+	require.NotNil(t, bestAsk, "Expected best ask order to be non-nil")
+	assert.Equal(t, decimal.New(110, 0), bestAsk.Price, "Expected best ask price to be 110")
+	assert.Equal(t, uint64(3), bestAsk.ID, "Expected best ask order ID to be 3")
+	n.Verify(t, []string{
+		"CreateOrder Accepted 1 1",
+		"CreateOrder Accepted 2 2",
+		"CreateOrder Accepted 3 1",
+		"CreateOrder Accepted 4 2",
+	})
+	n.Reset()
+
+	ob.CancelOrder(tok, bestBid.ID)
+	tok++
+	bestBid = ob.Bid(tok)
+	tok++
+	require.NotNil(t, bestBid, "Expected best bid order to be non-nil after cancellation")
+	assert.Equal(t, decimal.New(90, 0), bestBid.Price, "Expected best bid price to be 90 after cancellation")
+	assert.Equal(t, uint64(2), bestBid.ID, "Expected best bid order ID to be 2 after cancellation")
+
+	ob.CancelOrder(tok, bestAsk.ID)
+	tok++
+	bestAsk = ob.Ask(tok)
+	tok++
+	require.NotNil(t, bestAsk, "Expected best ask order to be non-nil after cancellation")
+	assert.Equal(t, decimal.New(120, 0), bestAsk.Price, "Expected best ask price to be 120 after cancellation")
+	assert.Equal(t, uint64(4), bestAsk.ID, "Expected best ask order ID to be 4 after cancellation")
+
+	ob.CancelOrder(tok, 2)
+	tok++
+	ob.CancelOrder(tok, 4)
+	tok++
+
+	assert.Nil(t, ob.Bid(tok), "Expected Bid to return nil after all buy orders are canceled")
+	tok++
+	assert.Nil(t, ob.Ask(tok), "Expected Ask to return nil after all sell orders are canceled")
+	tok++
+	n.Verify(t, []string{
+		"CancelOrder Canceled 1 1", // Expected cancellation of Bid order 1
+		"CancelOrder Canceled 3 1", // Expected cancellation of Ask order 3
+		"CancelOrder Canceled 2 2", // Expected cancellation of Bid order 2
+		"CancelOrder Canceled 4 2", // Expected cancellation of Ask order 4
+	})
+}
+
 var j uint64
 var k uint64 = 100000
 
