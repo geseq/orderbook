@@ -196,7 +196,7 @@ func printResultsWithPercentiles(b *testing.B, operationName string, data []floa
 		value := calculatePercentile(data, p)
 		b.Logf("%v: %f ms", p, value)
 	}
-	b.ReportMetric(calculatePercentile(data, percentiles[3]), strings.ReplaceAll(operationName, " ", "_"))
+	b.ReportMetric(calculatePercentile(data, percentiles[3]), strings.ReplaceAll(operationName, " ", "_")+"_ns/po")
 }
 
 func calculatePercentile(data []float64, percentile float64) float64 {
