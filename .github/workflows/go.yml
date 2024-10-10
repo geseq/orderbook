@@ -51,18 +51,5 @@ jobs:
           alert-threshold: "200%"
           comment-on-alert: true
           fail-on-alert: true
+          summary-always: true
           alert-comment-cc-users: "@Masorubka"
-
-      - name: Store benchmark result - separate results repo
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Go Benchmark
-          tool: "go"
-          output-file-path: output.txt
-          github-token: ${{ secrets.BENCHMARK_ACTION_BOT_TOKEN }}
-          auto-push: true
-          alert-threshold: "200%"
-          comment-on-alert: true
-          fail-on-alert: true
-          alert-comment-cc-users: "@Masorubka"
-          gh-repository: "github.com/benchmark-action/github-action-benchmark-results"
