@@ -84,7 +84,8 @@ jobs:
           name: main_benchmarks
           path: main_benchmarks.txt
 
-      - uses: actions/download-artifact@v3
+      - name: Download PR Benchmark Results
+        uses: actions/download-artifact@v3
         with:
           name: pr_benchmarks
           path: pr_benchmarks.txt
