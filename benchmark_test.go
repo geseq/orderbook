@@ -194,7 +194,7 @@ func printResultsWithPercentiles(b *testing.B, operationName string, data []floa
 
 	for _, p := range percentiles {
 		value := calculatePercentile(data, p)
-		metricName := fmt.Sprintf("%s_%v_percentile_ms", strings.ReplaceAll(operationName, " ", "\n"), p)
+		metricName := fmt.Sprintf("%s_P%v", strings.ReplaceAll(operationName, " ", "_"), p)
 		b.ReportMetric(value, metricName)
 	}
 }
