@@ -99,3 +99,26 @@ jobs:
           echo ""
           echo "Benchmark results for Main branch:"
           cat ./main_benchmarks.txt
+
+      - name: Comment on PR with Benchmark Comparison
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const diff = fs.readFileSync('diff_output.txt', 'utf8');
+            if (diff) {
+              github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `### Benchmark Comparison:\n\`\`\`\n${diff}\n\`\`\``
+              });
+            } else {
+              github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `### Benchmark Comparison:\nNo differences found.`
+              });
+            }
