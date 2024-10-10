@@ -1,14 +1,14 @@
 package orderbook
 
 import (
+	local_tree "github.com/geseq/orderbook/pkg/tree"
+	"github.com/geseq/udecimal"
 	decimal "github.com/geseq/udecimal"
 )
 
-//go:generate gotemplate "github.com/geseq/redblacktree" tree(udecimal.Decimal,*orderQueue)
-
 // priceLevel implements facade to operations with order queue
 type priceLevel struct {
-	priceTree *tree
+	priceTree *local_tree.Tree[decimal.Decimal, *orderQueue]
 	priceType PriceType
 
 	volume    decimal.Decimal
@@ -41,7 +41,7 @@ const (
 // newPriceLevel creates new priceLevel manager
 func newPriceLevel(priceType PriceType) *priceLevel {
 	return &priceLevel{
-		priceTree: newWithTree(Comparator),
+		priceTree: local_tree.NewWithTree[udecimal.Decimal, *orderQueue](Comparator, 1),
 		priceType: priceType,
 		volume:    decimal.Zero,
 	}
