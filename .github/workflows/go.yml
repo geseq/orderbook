@@ -49,6 +49,14 @@ jobs:
           key: ${{ runner.os }}-main-benchmarks
 
       - name: Store benchmark result
+        run: |
+          # Make sure to copy the benchmark output into the expected JSON format
+          # This requires transforming the output.txt into benchmark-data.json
+          # For example, use tools like `benchstat` or `go-benchmark-compare`
+          mv output.txt cache/benchmark-data.json
+        continue-on-error: true
+
+      - name: Upload benchmark data
         uses: rhysd/github-action-benchmark@v1
         with:
           tool: "go"
