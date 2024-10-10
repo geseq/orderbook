@@ -6,8 +6,6 @@ import (
 	decimal "github.com/geseq/udecimal"
 )
 
-//go:generate gotemplate "github.com/geseq/redblacktree" tree(udecimal.Decimal,*orderQueue)
-
 // priceLevel implements facade to operations with order queue
 type priceLevel struct {
 	priceTree *local_tree.Tree[decimal.Decimal, *orderQueue]

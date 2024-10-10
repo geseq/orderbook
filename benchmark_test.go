@@ -1,7 +1,6 @@
 package orderbook
 
 import (
-	"fmt"
 	"math/rand"
 	"runtime"
 	"strings"
@@ -31,14 +30,13 @@ func BenchmarkLatency(b *testing.B) {
 	printResultsWithPercentiles(b, "Cancel Order", totalCancelHist)
 }
 
-// Функция для бенчмарка Latency, который выполняется в течение указанного времени (duration)
 func runBenchmarkLatency(b *testing.B) ([]float64, []float64) {
 	seed := time.Now().UnixNano()
 	duration := 30 * time.Second
 	lowerBound := decimal.MustParse("50.0")
 	upperBound := decimal.MustParse("100.0")
 	minSpread := decimal.MustParse("0.25")
-	sched := true
+	sched := false
 
 	ob := getOrderBook()
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
@@ -193,11 +191,12 @@ func runBenchmarkThroughput(b *testing.B) []float64 {
 func printResultsWithPercentiles(b *testing.B, operationName string, data []float64) {
 	percentiles := []float64{50, 75, 90, 95, 99, 99.9}
 
+	b.Logf("Operation: %s", operationName)
 	for _, p := range percentiles {
 		value := calculatePercentile(data, p)
-		metricName := fmt.Sprintf("%s_%v_percentile_ms", strings.ReplaceAll(operationName, " ", "_"), p)
-		b.ReportMetric(value, metricName)
+		b.Logf("%v: %f ms", p, value)
 	}
+	b.ReportMetric(calculatePercentile(data, percentiles[3]), strings.ReplaceAll(operationName, " ", "_")+"_95_ns/po")
 }
 
 func calculatePercentile(data []float64, percentile float64) float64 {

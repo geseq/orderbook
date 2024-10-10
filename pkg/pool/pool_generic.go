@@ -7,11 +7,6 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
-// var oPool = newOrderPool(1)
-// var ntPool = newNodeTreePool(1)
-// var notPool = newOrderTreeNodePool(1)
-// var oqPool = newOrderQueuePool(1)
-
 // ItemPoolV2 is a generic item pool with the V2 suffix
 type ItemPoolV2[T any] struct {
 	ch *ItemChanV2[T]
