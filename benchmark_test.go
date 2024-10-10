@@ -1,10 +1,8 @@
 package orderbook
 
 import (
-	"fmt"
 	"math/rand"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -192,10 +190,10 @@ func runBenchmarkThroughput(b *testing.B) []float64 {
 func printResultsWithPercentiles(b *testing.B, operationName string, data []float64) {
 	percentiles := []float64{50, 75, 90, 95, 99, 99.9}
 
+	b.Logf("Operation: %s", operationName)
 	for _, p := range percentiles {
 		value := calculatePercentile(data, p)
-		metricName := fmt.Sprintf("%s_P%v", strings.ReplaceAll(operationName, " ", "_"), p)
-		b.ReportMetric(value, metricName)
+		b.Logf("%v: %f ms", p, value)
 	}
 }
 
