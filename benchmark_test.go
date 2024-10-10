@@ -31,7 +31,6 @@ func BenchmarkLatency(b *testing.B) {
 	printResultsWithPercentiles(b, "Cancel Order", totalCancelHist)
 }
 
-// Функция для бенчмарка Latency, который выполняется в течение указанного времени (duration)
 func runBenchmarkLatency(b *testing.B) ([]float64, []float64) {
 	seed := time.Now().UnixNano()
 	duration := 30 * time.Second
