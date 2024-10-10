@@ -2,24 +2,102 @@ name: Go
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.19
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
 
-    - name: Build
-      run: go build -v ./...
+      - name: Build
+        run: go build -v ./...
 
-    - name: Test
-      run: go test -v ./...
+      - name: Test
+        run: go test -v ./...
+
+  cache-main-benchmark:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Cache Main Branch Benchmarks
+        id: cache-benchmark
+        uses: actions/cache@v3
+        with:
+          path: main_benchmarks.txt
+          key: main-benchmarks-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            main-benchmarks-${{ runner.os }}-
+
+      - name: Run Benchmarks on Main Branch (if no cache)
+        if: steps.cache-benchmark.outputs.cache-hit != 'true'
+        run: |
+          git fetch origin main
+          git checkout origin/main
+          go test -bench . -benchmem -run=^$ ./... > main_benchmarks.txt
+        continue-on-error: true
+
+      - name: Save Main Benchmark Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: main_benchmarks
+          path: main_benchmarks.txt
+
+  run-pr-benchmark:
+    runs-on: ubuntu-latest
+    needs: cache-main-benchmark
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run Benchmarks on PR Branch
+        run: |
+          go test -bench . -benchmem -run=^$ ./... > pr_benchmarks.txt
+        continue-on-error: true
+
+      - name: Save PR Benchmark Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pr_benchmarks
+          path: pr_benchmarks.txt
+
+  compare-benchmarks:
+    runs-on: ubuntu-latest
+    needs: run-pr-benchmark
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download Main and PR Benchmark Results
+        uses: actions/download-artifact@v3
+        with:
+          name: main_benchmarks
+          path: main_benchmarks.txt
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: pr_benchmarks
+          path: pr_benchmarks.txt
+
+      - name: Compare Benchmarks
+        run: |
+          echo "Comparing benchmarks..."
+          diff main_benchmarks.txt pr_benchmarks.txt || true
+
+      - name: Display Benchmark Results
+        run: |
+          echo "Benchmark results for PR branch:"
+          cat pr_benchmarks.txt
+          echo ""
+          echo "Benchmark results for Main branch:"
+          cat main_benchmarks.txt

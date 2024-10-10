@@ -3,12 +3,10 @@ package orderbook
 import (
 	"bufio"
 	"fmt"
-	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	decimal "github.com/geseq/udecimal"
 	"github.com/stretchr/testify/assert"
@@ -654,52 +652,6 @@ func TestOrderBook_BidAndAsk(t *testing.T) {
 
 var j uint64
 var k uint64 = 100000
-
-func BenchmarkOrderbook(b *testing.B) {
-	benchmarkOrderbookLimitCreate(10000, b)
-}
-
-func benchmarkOrderbookLimitCreate(n int, b *testing.B) {
-	tok = 1
-	on := &EmptyNotification{}
-	ob := NewOrderBook(on)
-
-	orders := make([]Order, 1000_000)
-	for i := 0; i < 1000_000; i++ {
-		side := Buy
-		class := Limit
-		if rand.Intn(10) < 5 {
-			side = Sell
-		}
-		if rand.Intn(10) < 7 {
-			class = Market
-		}
-
-		orders[i] = Order{
-			ID:        uint64(i),
-			Class:     class,
-			Side:      side,
-			Flag:      None,
-			Qty:       decimal.NewI(uint64(rand.Intn(1000)), 0),
-			Price:     decimal.NewI(uint64(rand.Intn(100000)), uint(rand.Intn(3))),
-			TrigPrice: decimal.Zero,
-		}
-	}
-
-	b.ReportAllocs()
-
-	stopwatch := time.Now()
-	b.ResetTimer()
-	for i := 0; i < b.N; i += 1 {
-		order := orders[rand.Intn(999_999)]
-		ob.AddOrder(tok, uint64(i), order.Class, order.Side, order.Price, order.Qty, order.TrigPrice, order.Flag) // 1 ts
-		tok++
-	}
-	b.StopTimer()
-	elapsed := time.Since(stopwatch)
-	fmt.Printf("\n\nElapsed: %s\nOrders per second (avg): %f\n", elapsed, float64(b.N)/elapsed.Seconds())
-	b.StartTimer()
-}
 
 func getTestOrderBook() (*Notification, *OrderBook) {
 	tok = 1
