@@ -1,10 +1,12 @@
-name: Go
+name: Go Benchmark Comparison
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
@@ -93,35 +95,20 @@ jobs:
           echo "Comparing benchmarks..."
           diff_output=$(diff ./main_benchmarks.txt ./pr_benchmarks.txt || true)
           echo "$diff_output" > ./diff_output.txt
-          cat ./diff_output.txt
 
-      - name: Display Benchmark Results
+      - name: Install Reviewdog
         run: |
-          echo "Benchmark results for PR branch:"
-          cat ./pr_benchmarks.txt
-          echo ""
-          echo "Benchmark results for Main branch:"
-          cat ./main_benchmarks.txt
+          curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh | sh -s -- -b ./bin v0.12.0
 
-      - name: Comment on PR with Benchmark Comparison
-        uses: actions/github-script@v6
+      - name: Post Benchmark Comparison Comment
+        uses: reviewdog/action-comment@v1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const diff = fs.readFileSync('diff_output.txt', 'utf8');
-            if (diff) {
-              github.rest.issues.createComment({
-                issue_number: context.payload.pull_request.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `### Benchmark Comparison:\n\`\`\`\n${diff}\n\`\`\``
-              });
-            } else {
-              github.rest.issues.createComment({
-                issue_number: context.payload.pull_request.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `### Benchmark Comparison:\nNo differences found.`
-              });
-            }
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: "github-pr-review"
+          path: "diff_output.txt"
+          body: |
+            Benchmark comparison:
+            ```diff
+            ${{ steps.benchmark-compare.outputs.diff_output }}
+            ```
+          tool_name: "Benchmark Comparison"
