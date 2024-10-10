@@ -46,7 +46,7 @@ jobs:
           name: Go Benchmark
           tool: "go"
           output-file-path: output.txt
-          github-token: ${{ secrets.PAT_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           alert-threshold: "200%"
           comment-on-alert: true
