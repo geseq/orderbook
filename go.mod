@@ -1,6 +1,6 @@
 module github.com/geseq/orderbook
 
-go 1.23.0
+go 1.23
 
 require (
 	fortio.org/fortio v1.67.1
