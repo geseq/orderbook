@@ -36,24 +36,26 @@ jobs:
         with:
           go-version: "stable"
 
-      - name: Run benchmark on PR or Main
-        run: |
-          mkdir -p cache
-          go test -bench . -benchmem -run=^$ ./... > output.txt
-
       - name: Cache previous benchmark results
-        if: github.ref == 'refs/heads/main'
         uses: actions/cache@v4
         with:
           path: ./cache
           key: ${{ runner.os }}-main-benchmarks
+          restore-keys: |
+            ${{ runner.os }}-main-benchmarks
 
-      - name: Upload benchmark data
+      - name: Run benchmark and save output
+        run: |
+          mkdir -p cache
+          go test -bench . -benchmem -run=^$ ./... > output.txt
+
+      - name: Upload benchmark result and check for performance regressions
         uses: rhysd/github-action-benchmark@v1
         with:
           tool: "go"
           output-file-path: output.txt
           external-data-json-path: ./cache/benchmark-data.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
           comment-on-alert: true
           fail-on-alert: true
