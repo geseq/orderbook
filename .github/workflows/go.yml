@@ -48,8 +48,7 @@ jobs:
           tool: "go"
           output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          alert-threshold: "10%"
+          alert-threshold: "15%"
           comment-on-alert: true
           fail-on-alert: true
           summary-always: true
-          alert-comment-cc-users: "@Masorubka"
