@@ -38,6 +38,7 @@ jobs:
 
       - name: Run benchmark on PR or Main
         run: |
+          mkdir -p cache
           go test -bench . -benchmem -run=^$ ./... > output.txt
 
       - name: Cache previous benchmark results
