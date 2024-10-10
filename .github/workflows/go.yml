@@ -88,9 +88,12 @@ jobs:
           name: pr_benchmarks
 
       - name: Compare Benchmarks
+        id: benchmark-compare
         run: |
           echo "Comparing benchmarks..."
-          diff ./main_benchmarks.txt ./pr_benchmarks.txt || true
+          diff_output=$(diff ./main_benchmarks.txt ./pr_benchmarks.txt || true)
+          echo "$diff_output" > ./diff_output.txt
+          cat ./diff_output.txt
 
       - name: Display Benchmark Results
         run: |
