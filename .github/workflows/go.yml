@@ -34,7 +34,7 @@ jobs:
         id: cache-benchmark
         uses: actions/cache@v3
         with:
-          path: main_benchmarks.txt
+          path: ./main_benchmarks.txt
           key: main-benchmarks-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             main-benchmarks-${{ runner.os }}-
@@ -82,23 +82,20 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: main_benchmarks
-          path: main_benchmarks.txt
 
-      - name: Download PR Benchmark Results
-        uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v3
         with:
           name: pr_benchmarks
-          path: pr_benchmarks.txt
 
       - name: Compare Benchmarks
         run: |
           echo "Comparing benchmarks..."
-          diff main_benchmarks.txt pr_benchmarks.txt || true
+          diff ./main_benchmarks.txt ./pr_benchmarks.txt || true
 
       - name: Display Benchmark Results
         run: |
           echo "Benchmark results for PR branch:"
-          cat pr_benchmarks.txt
+          cat ./pr_benchmarks.txt
           echo ""
           echo "Benchmark results for Main branch:"
-          cat main_benchmarks.txt
+          cat ./main_benchmarks.txt
