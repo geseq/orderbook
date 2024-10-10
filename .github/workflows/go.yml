@@ -25,97 +25,34 @@ jobs:
 
   benchmark:
     runs-on: ubuntu-latest
-    needs: build
-
     steps:
       - uses: actions/checkout@v3
 
-      - name: Cache Reviewdog
-        uses: actions/cache@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
         with:
-          path: ~/reviewdog
-          key: reviewdog-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            reviewdog-${{ runner.os }}-
+          go-version: "stable"
 
-      - name: Install Reviewdog (if not cached)
-        if: steps.cache.outputs.cache-hit != 'true'
+      # Run benchmark and store output
+      - name: Run benchmark on PR or Main
         run: |
-          mkdir -p ~/reviewdog
-          curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh | sh -s -- -b ~/reviewdog
-        shell: bash
+          go test -bench . -benchmem -run=^$ ./... > output.txt
 
-      - name: Cache Main Branch Benchmarks
-        id: cache-benchmark
-        uses: actions/cache@v3
+      # Cache benchmark results for main
+      - name: Cache previous benchmark results
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache@v4
         with:
-          path: ./main_benchmarks.txt
-          key: main-benchmarks-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            main-benchmarks-${{ runner.os }}-
+          path: ./cache
+          key: ${{ runner.os }}-main-benchmarks
 
-      - name: Run Benchmarks on Main Branch (if no cache)
-        if: steps.cache-benchmark.outputs.cache-hit != 'true'
-        run: |
-          git fetch origin main
-          git checkout origin/main
-          go test -bench . -benchmem -run=^$ ./... > main_benchmarks.txt
-        continue-on-error: true
-
-      - name: Save Main Benchmark Results
-        uses: actions/upload-artifact@v3
+      # Store benchmark results using the Continuous Benchmarking action
+      - name: Store benchmark result
+        uses: rhysd/github-action-benchmark@v1
         with:
-          name: main_benchmarks
-          path: main_benchmarks.txt
-
-  run-pr-benchmark:
-    runs-on: ubuntu-latest
-    needs: benchmark
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Run Benchmarks on PR Branch
-        run: |
-          go test -bench . -benchmem -run=^$ ./... > pr_benchmarks.txt
-        continue-on-error: true
-
-      - name: Save PR Benchmark Results
-        uses: actions/upload-artifact@v3
-        with:
-          name: pr_benchmarks
-          path: pr_benchmarks.txt
-
-  compare-benchmarks:
-    runs-on: ubuntu-latest
-    needs: run-pr-benchmark
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Download Main and PR Benchmark Results
-        uses: actions/download-artifact@v3
-        with:
-          name: main_benchmarks
-
-      - uses: actions/download-artifact@v3
-        with:
-          name: pr_benchmarks
-
-      - name: Compare Benchmarks
-        id: benchmark-compare
-        run: |
-          diff_output=$(diff ./main_benchmarks.txt ./pr_benchmarks.txt || true)
-          echo "$diff_output" > ./diff_output.txt
-          echo "Comparing benchmarks..."
-          cat ./diff_output.txt
-
-      - name: Post Benchmark Comparison as Comment
-        uses: reviewdog/action-comment@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          path: ./diff_output.txt
-          reporter: github-pr-review
-          filter_mode: added
-          fail_on_error: false
-          comment_title: "Benchmark Comparison"
+          tool: "go"
+          output-file-path: output.txt
+          external-data-json-path: ./cache/benchmark-data.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          fail-on-alert: true
