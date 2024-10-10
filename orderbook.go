@@ -3,10 +3,10 @@ package orderbook
 import (
 	"sync/atomic"
 
+	"github.com/geseq/orderbook/pkg/pool"
+	local_tree "github.com/geseq/orderbook/pkg/tree"
 	decimal "github.com/geseq/udecimal"
 )
-
-//go:generate gotemplate "github.com/geseq/redblacktree" orderTree(uint64,*Order)
 
 // NotificationHandler handles notification updates
 type NotificationHandler interface {
@@ -14,19 +14,17 @@ type NotificationHandler interface {
 	PutTrade(makerOrderID, takerOrderID uint64, makerStatus, takerStatus OrderStatus, qty, price decimal.Decimal)
 }
 
-var oPool = newOrderPool(1)
-var ntPool = newNodeTreePool(1)
-var notPool = newOrderTreeNodePool(1)
-var oqPool = newOrderQueuePool(1)
+var oPool = pool.NewItemPoolV2[Order](1)
+var oqPool = pool.NewItemPoolV2[orderQueue](1)
 
 // OrderBook implements standard matching algorithm
 type OrderBook struct {
 	asks         *priceLevel
 	bids         *priceLevel
-	triggerUnder *priceLevel // orders triggering under last price i.e. Stop Sell or Take Buy
-	triggerOver  *priceLevel // orders that trigger over last price i.e. Stop Buy or Take Sell
-	orders       *orderTree  // orderId -> *Order
-	trigOrders   *orderTree  // orderId -> *Order
+	triggerUnder *priceLevel                      // orders triggering under last price i.e. Stop Sell or Take Buy
+	triggerOver  *priceLevel                      // orders that trigger over last price i.e. Stop Buy or Take Sell
+	orders       *local_tree.Tree[uint64, *Order] // orderId -> *Order
+	trigOrders   *local_tree.Tree[uint64, *Order] // orderId -> *Order
 	trigQueue    *triggerQueue
 
 	notification NotificationHandler
@@ -56,8 +54,8 @@ func Uint64Cmp(a, b uint64) int {
 // NewOrderBook creates Orderbook object
 func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 	ob := &OrderBook{
-		orders:       newWithOrderTree(Uint64Cmp),
-		trigOrders:   newWithOrderTree(Uint64Cmp),
+		orders:       local_tree.NewWithTree[uint64, *Order](Uint64Cmp, 2),
+		trigOrders:   local_tree.NewWithTree[uint64, *Order](Uint64Cmp, 2),
 		trigQueue:    newTriggerQueue(),
 		bids:         newPriceLevel(BidPrice),
 		asks:         newPriceLevel(AskPrice),
@@ -69,10 +67,8 @@ func NewOrderBook(n NotificationHandler, opts ...Option) *OrderBook {
 	options(defaultOpts).applyTo(ob)
 	options(opts).applyTo(ob)
 
-	oPool = newOrderPool(ob.orderPoolSize)
-	ntPool = newNodeTreePool(ob.nodeTreePoolSize)
-	notPool = newOrderTreeNodePool(ob.orderTreeNodePoolSize)
-	oqPool = newOrderQueuePool(ob.orderQueuePoolSize)
+	oPool = pool.NewItemPoolV2[Order](ob.orderPoolSize)
+	oqPool = pool.NewItemPoolV2[orderQueue](ob.orderQueuePoolSize)
 
 	return ob
 }
