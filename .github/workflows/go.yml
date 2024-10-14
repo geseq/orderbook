@@ -21,33 +21,24 @@ jobs:
         with:
           go-version: "stable"
 
-      - name: Install go-junit-report
-        run: go install github.com/jstemmer/go-junit-report@latest
-
       - name: Build
         run: go build -v ./...
 
-      - name: Run Tests and Generate JUnit Report
+      - name: Run Tests and Generate Test Report
         run: |
           mkdir -p reports
-          go test -v ./... 2>&1 | go-junit-report > reports/report.xml
+          go test -v -json ./... > reports/report.json
 
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v3
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
         with:
-          name: test-report
-          path: reports/report.xml
-
-      - name: Report Test Results
-        uses: dorny/test-reporter@v1.9.1 # Используем обновленную версию
-        if: always() # Обеспечивает выполнение шага даже при сбое тестов
-        with:
-          name: Go Tests
-          path: reports/report.xml
-          reporter: github-pr-review # Публикует результаты как комментарий в PR
-          fail-on-error: false # Не прерывает workflow при ошибках в отчете
-          require-tests: true # Указывает, что должны быть тесты
-          check-name: Unit Tests # Имя проверки в статусах PR
+          files: 'reports/report.json'
+          check_name: 'Go Tests'
+          comment_title: 'Go Test Results'
+          commit: ${{ github.event.pull_request.head.sha }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          hide_comments: all_but_latest
+          dedup_classes_by_file_name: true
 
   benchmark:
     name: Run Go benchmarks
@@ -60,7 +51,7 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: "1.x"
+          go-version: '1.x'
 
       - name: Run benchmarks
         run: |
@@ -70,11 +61,11 @@ jobs:
       - name: Post Benchmark Results
         uses: rhysd/github-action-benchmark@v1
         with:
-          tool: "go"
-          benchmark-data: benchmarks/benchmark.txt
+          tool: 'go'
+          output-file-path: 'benchmarks/benchmark.txt'  # Corrected input name
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          compare-with: "main" # Измените на нужную вам ветку
+          ref: 'main'  # Corrected input name
           comment-on-alert: true
-          alert-threshold: "15%"
+          alert-threshold: '15%'
           fail-on-alert: true
           summary-always: true
