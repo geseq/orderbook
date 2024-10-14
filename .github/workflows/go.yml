@@ -9,22 +9,40 @@ on:
 permissions:
   pull-requests: write
   contents: write
-  deployments: write
+  statuses: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v4
         with:
           go-version: "stable"
 
+      - name: Install go-junit-report
+        run: go install github.com/jstemmer/go-junit-report@latest
+
       - name: Build
         run: go build -v ./...
 
-      - name: Test
-        run: go test -v ./...
+      - name: Run Tests and Generate JUnit Report
+        run: go test -v ./... 2>&1 | go-junit-report > report.xml
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report
+          path: report.xml
+
+      - name: Report Test Results
+        uses: dorny/test-reporter@v1
+        with:
+          name: Go Tests
+          path: report.xml
+          reporter: github-pr-review # or github-check
+          fail-on-error: true
 
   benchmark:
     name: Run Go benchmark example
