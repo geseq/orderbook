@@ -36,7 +36,7 @@ func runBenchmarkLatency(b *testing.B) ([]float64, []float64) {
 	lowerBound := decimal.MustParse("50.0")
 	upperBound := decimal.MustParse("100.0")
 	minSpread := decimal.MustParse("0.25")
-	sched := true
+	sched := false
 
 	ob := getOrderBook()
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
