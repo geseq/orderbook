@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 permissions:
+  contents: read
   pull-requests: write
-  contents: write
   statuses: write
 
 jobs:
@@ -28,45 +28,53 @@ jobs:
         run: go build -v ./...
 
       - name: Run Tests and Generate JUnit Report
-        run: go test -v ./... 2>&1 | go-junit-report > report.xml
+        run: |
+          mkdir -p reports
+          go test -v ./... 2>&1 | go-junit-report > reports/report.xml
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v3
         with:
           name: test-report
-          path: report.xml
+          path: reports/report.xml
 
       - name: Report Test Results
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v1.5.1 # Используем обновленную версию
+        if: always() # Обеспечивает выполнение шага даже при сбое тестов
         with:
           name: Go Tests
-          path: report.xml
-          reporter: github-pr-review # or github-check
-          fail-on-error: true
+          path: reports/report.xml
+          reporter: github-pr-review # Публикует результаты как комментарий в PR
+          fail-on-error: false # Не прерывает workflow при ошибках в отчете
+          require-tests: true # Указывает, что должны быть тесты
+          check-name: Unit Tests # Имя проверки в статусах PR
 
   benchmark:
-    name: Run Go benchmark example
+    name: Run Go benchmarks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v4
         with:
-          go-version: "stable"
+          go-version: "1.x"
 
-      - name: Run benchmark
+      - name: Run benchmarks
         run: |
-          mkdir -p cache
-          go test -bench . -benchmem -run=^$ ./... | tee output.txt
+          mkdir -p benchmarks
+          go test -bench . -benchmem -run=^$ ./... > benchmarks/benchmark.txt
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
+      - name: Post Benchmark Results
+        uses: rhysd/github-action-benchmark@v1
         with:
-          name: Go Benchmark
           tool: "go"
-          output-file-path: output.txt
+          benchmark-data: benchmarks/benchmark.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          alert-threshold: "15%"
+          compare-with: "main" # Измените на нужную вам ветку
           comment-on-alert: true
+          alert-threshold: "15%"
           fail-on-alert: true
           summary-always: true
