@@ -39,7 +39,7 @@ jobs:
           path: reports/report.xml
 
       - name: Report Test Results
-        uses: dorny/test-reporter@v1.5.1 # Используем обновленную версию
+        uses: dorny/test-reporter@v1.9.1 # Используем обновленную версию
         if: always() # Обеспечивает выполнение шага даже при сбое тестов
         with:
           name: Go Tests
