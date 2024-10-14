@@ -37,8 +37,8 @@ jobs:
           comment_title: 'Go Test Results'
           commit: ${{ github.event.pull_request.head.sha }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          hide_comments: all_but_latest
-          dedup_classes_by_file_name: true
+          hide_comments: 'all but latest'
+          deduplicate_classes_by_file_name: true
 
   benchmark:
     name: Run Go benchmarks
@@ -62,9 +62,9 @@ jobs:
         uses: rhysd/github-action-benchmark@v1
         with:
           tool: 'go'
-          output-file-path: 'benchmarks/benchmark.txt'  # Corrected input name
+          output-file-path: 'benchmarks/benchmark.txt'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          ref: 'main'  # Corrected input name
+          ref: 'main'
           comment-on-alert: true
           alert-threshold: '15%'
           fail-on-alert: true
