@@ -50,6 +50,7 @@ func runBenchmarkLatency(b *testing.B, duration time.Duration, lowerBound, upper
 
 	loopStart := hrtime.TSC()
 	for i := uint64(0); i < iterations; i++ {
+		// Each iteration is 4 operations: 2 cancels and 2 adds
 		var r = rand.Intn(10)
 		dec := r < 5
 
@@ -84,8 +85,13 @@ func runBenchmarkLatency(b *testing.B, duration time.Duration, lowerBound, upper
 		addHist.Record(float64(hrtime.TSCSince(start).ApproxDuration()))
 	}
 
+	operations := iterations * 4
 	elapsed := hrtime.TSCSince(loopStart).ApproxDuration()
-	b.ReportMetric(float64(iterations)/elapsed.Seconds(), "ops/sec")
+	throughput := float64(operations) / elapsed.Seconds()
+	avgLatency := float64(elapsed.Nanoseconds()) / float64(operations)
+
+	b.ReportMetric(throughput, "ops/sec")
+	b.ReportMetric(avgLatency, "ns/op")
 
 	return addHist, cancelHist
 }
@@ -105,7 +111,6 @@ func runBenchmarkThroughput(b *testing.B, duration time.Duration, lowerBound, up
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
 
 	var tok, buyID, sellID uint64
-	var operations int
 	rand := rand.New(rand.NewSource(seed))
 
 	b.ReportAllocs()
@@ -115,6 +120,7 @@ func runBenchmarkThroughput(b *testing.B, duration time.Duration, lowerBound, up
 	start := hrtime.TSC()
 
 	for i := uint64(0); i < iterations; i++ {
+		// Each iteration is 4 operations: 2 cancels and 2 adds
 		var r = rand.Intn(10)
 		dec := r < 5
 
@@ -136,9 +142,9 @@ func runBenchmarkThroughput(b *testing.B, duration time.Duration, lowerBound, up
 
 		ob.AddOrder(buyID, buyID, Limit, Buy, bidQty, bid, decimal.Zero, None)
 		ob.AddOrder(sellID, sellID, Limit, Sell, askQty, ask, decimal.Zero, None)
-		operations += 4
 	}
 
+	operations := iterations * 4
 	elapsed := hrtime.TSCSince(start).ApproxDuration()
 	throughput := float64(operations) / elapsed.Seconds()
 	avgLatency := float64(elapsed.Nanoseconds()) / float64(operations)
