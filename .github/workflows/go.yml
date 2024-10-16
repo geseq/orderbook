@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  statuses: write
   checks: write
 
 jobs:
@@ -24,21 +25,21 @@ jobs:
       - name: Build
         run: go build -v ./...
 
+      - name: Install go-junit-report
+        run: go install github.com/jstemmer/go-junit-report/v2@latest
       - name: Run Tests and Generate Test Report
         run: |
           mkdir -p reports
-          go test -v -json ./... > reports/report.json
 
+          go test -v ./... 2>&1 | go-junit-report > reports/report.xml
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
-          files: 'reports/report.json'
+          files: 'reports/report.xml'
           check_name: 'Go Tests'
           comment_title: 'Go Test Results'
           commit: ${{ github.event.pull_request.head.sha || github.sha }}
-          event_file: ${{ github.event_path }}
-          event_name: ${{ github.event_name }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           hide_comments: 'all but latest'
           deduplicate_classes_by_file_name: true
