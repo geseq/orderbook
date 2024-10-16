@@ -62,7 +62,7 @@ jobs:
           go test -bench . -benchmem -run=^$ ./... > benchmarks/benchmark.txt
 
       - name: Post Benchmark Results
-        uses: benchmark-action/github-action-benchmarkk@v1
+        uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'go'
           output-file-path: 'benchmarks/benchmark.txt'
