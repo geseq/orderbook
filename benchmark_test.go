@@ -1,59 +1,55 @@
 package orderbook
 
 import (
+	"flag"
 	"math/rand"
 	"runtime"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"fortio.org/fortio/stats"
 	decimal "github.com/geseq/udecimal"
+	"github.com/loov/hrtime"
 )
 
-func BenchmarkLatency(b *testing.B) {
-	var totalAddHist, totalCancelHist []float64
-	var mu sync.Mutex
+var (
+	lowerBound = decimal.MustParse("50.0")
+	upperBound = decimal.MustParse("100.0")
+	minSpread  = decimal.MustParse("0.25")
+	duration   = 30 * time.Second
+)
 
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			addHist, cancelHist := runBenchmarkLatency(b)
-
-			mu.Lock()
-			totalAddHist = append(totalAddHist, addHist...)
-			totalCancelHist = append(totalCancelHist, cancelHist...)
-			mu.Unlock()
-		}
-	})
-
-	printResultsWithPercentiles(b, "Add Order", totalAddHist)
-	printResultsWithPercentiles(b, "Cancel Order", totalCancelHist)
+func init() {
+	testing.Init()
+	flag.Parse()
 }
 
-func runBenchmarkLatency(b *testing.B) ([]float64, []float64) {
-	seed := time.Now().UnixNano()
-	duration := 30 * time.Second
-	lowerBound := decimal.MustParse("50.0")
-	upperBound := decimal.MustParse("100.0")
-	minSpread := decimal.MustParse("0.25")
-	sched := false
+func BenchmarkLatency(b *testing.B) {
+	b.ResetTimer()
+	addHist, cancelHist := runBenchmarkLatency(b, duration, lowerBound, upperBound, minSpread)
+	b.StopTimer()
 
+	printResultsWithPercentiles(b, "AddOrder", addHist)
+	printResultsWithPercentiles(b, "CancelOrder", cancelHist)
+}
+
+func runBenchmarkLatency(b *testing.B, duration time.Duration, lowerBound, upperBound, minSpread decimal.Decimal) (*stats.Histogram, *stats.Histogram) {
+	seed := time.Now().UnixNano()
 	ob := getOrderBook()
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
 
 	var tok, buyID, sellID uint64
 	rand := rand.New(rand.NewSource(seed))
 
-	addHist := make([]float64, 0, 1000)
-	cancelHist := make([]float64, 0, 1000)
+	addHist := stats.NewHistogram(10, 1)
+	cancelHist := stats.NewHistogram(10, 1)
 
 	b.ReportAllocs()
 
-	endTime := time.Now().Add(duration)
+	iterations := uint64(duration.Seconds()) * 2_000_000 // to avoid making clock calls in a loop, assuming roughly 500 nanos per iteration (4 operations)
 
-	b.ResetTimer()
-
-	for time.Now().Before(endTime) {
+	loopStart := hrtime.TSC()
+	for i := uint64(0); i < iterations; i++ {
 		var r = rand.Intn(10)
 		dec := r < 5
 
@@ -65,78 +61,46 @@ func runBenchmarkLatency(b *testing.B) ([]float64, []float64) {
 		}
 
 		tok++
-		if sched {
-			runtime.Gosched()
-		}
-
-		start := time.Now()
+		start := hrtime.TSC()
 		ob.CancelOrder(tok, buyID)
-		elapsed := time.Since(start).Nanoseconds()
-		cancelHist = append(cancelHist, float64(elapsed))
+		cancelHist.Record(float64(hrtime.TSCSince(start).ApproxDuration()))
 
 		tok++
-		if sched {
-			runtime.Gosched()
-		}
-
-		start = time.Now()
+		start = hrtime.TSC()
 		ob.CancelOrder(tok, sellID)
-		elapsed = time.Since(start).Nanoseconds()
-		cancelHist = append(cancelHist, float64(elapsed))
+		cancelHist.Record(float64(hrtime.TSCSince(start).ApproxDuration()))
 
 		tok++
 		buyID = tok
 		tok++
 		sellID = tok
 
-		if sched {
-			runtime.Gosched()
-		}
-
-		start = time.Now()
+		start = hrtime.TSC()
 		ob.AddOrder(buyID, buyID, Limit, Buy, bidQty, bid, decimal.Zero, None)
-		elapsed = time.Since(start).Nanoseconds()
-		addHist = append(addHist, float64(elapsed))
+		addHist.Record(float64(hrtime.TSCSince(start).ApproxDuration()))
 
-		if sched {
-			runtime.Gosched()
-		}
-
-		start = time.Now()
+		start = hrtime.TSC()
 		ob.AddOrder(sellID, sellID, Limit, Sell, askQty, ask, decimal.Zero, None)
-		elapsed = time.Since(start).Nanoseconds()
-		addHist = append(addHist, float64(elapsed))
+		addHist.Record(float64(hrtime.TSCSince(start).ApproxDuration()))
 	}
 
-	b.StopTimer()
+	elapsed := hrtime.TSCSince(loopStart).ApproxDuration()
+	b.ReportMetric(float64(iterations)/elapsed.Seconds(), "ops/sec")
 
 	return addHist, cancelHist
 }
 
 func BenchmarkThroughput(b *testing.B) {
-	var totalThroughputHist []float64
-	var mu sync.Mutex
+	b.ResetTimer()
+	throughput, avgLatency := runBenchmarkThroughput(b, duration, lowerBound, upperBound, minSpread)
+	b.StopTimer()
 
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			throughputHist := runBenchmarkThroughput(b)
-
-			mu.Lock()
-			totalThroughputHist = append(totalThroughputHist, throughputHist...)
-			mu.Unlock()
-		}
-	})
-
-	printResultsWithPercentiles(b, "Throughput", totalThroughputHist)
+	b.ReportMetric(throughput, "ops/sec")
+	b.ReportMetric(avgLatency, "ns/op")
 }
 
-func runBenchmarkThroughput(b *testing.B) []float64 {
+func runBenchmarkThroughput(b *testing.B, duration time.Duration, lowerBound, upperBound, minSpread decimal.Decimal) (float64, float64) {
 	seed := time.Now().UnixNano()
-	duration := 30 * time.Second
-	lowerBound := decimal.MustParse("50.0")
-	upperBound := decimal.MustParse("100.0")
-	minSpread := decimal.MustParse("0.25")
-
 	ob := getOrderBook()
 	bid, ask, bidQty, askQty := getInitialVars(lowerBound, upperBound, minSpread)
 
@@ -144,16 +108,13 @@ func runBenchmarkThroughput(b *testing.B) []float64 {
 	var operations int
 	rand := rand.New(rand.NewSource(seed))
 
-	throughputHist := make([]float64, 0, 1000)
-
 	b.ReportAllocs()
 
-	b.ResetTimer()
+	iterations := uint64(duration.Seconds()) * 2_000_000 // to avoid making clock calls in a loop, assuming roughly 500 nanos per iteration (4 operations)
 
-	start := time.Now()
-	end := start.Add(duration)
+	start := hrtime.TSC()
 
-	for time.Now().Before(end) {
+	for i := uint64(0); i < iterations; i++ {
 		var r = rand.Intn(10)
 		dec := r < 5
 
@@ -176,96 +137,22 @@ func runBenchmarkThroughput(b *testing.B) []float64 {
 		ob.AddOrder(buyID, buyID, Limit, Buy, bidQty, bid, decimal.Zero, None)
 		ob.AddOrder(sellID, sellID, Limit, Sell, askQty, ask, decimal.Zero, None)
 		operations += 4
-
-		elapsed := time.Since(start).Nanoseconds()
-		if elapsed > 0 {
-			throughput := float64(operations) / float64(elapsed)
-			throughputHist = append(throughputHist, throughput)
-		}
 	}
-	b.StopTimer()
 
-	return throughputHist
+	elapsed := hrtime.TSCSince(start).ApproxDuration()
+	throughput := float64(operations) / elapsed.Seconds()
+	avgLatency := float64(elapsed.Nanoseconds()) / float64(operations)
+
+	return throughput, avgLatency
 }
 
-func printResultsWithPercentiles(b *testing.B, operationName string, data []float64) {
-	percentiles := []float64{50, 75, 90, 95, 99, 99.9}
-
+func printResultsWithPercentiles(b *testing.B, operationName string, hist *stats.Histogram) {
+	percentiles := []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.9999, 100}
 	b.Logf("Operation: %s", operationName)
 	for _, p := range percentiles {
-		value := calculatePercentile(data, p)
-		b.Logf("%v: %f ms", p, value)
+		value := hist.Export().CalcPercentile(p)
+		b.Logf("%v: %f ns", p, value)
 	}
-	b.ReportMetric(calculatePercentile(data, percentiles[3]), strings.ReplaceAll(operationName, " ", "_")+"_95_ns/po")
-}
-
-func calculatePercentile(data []float64, percentile float64) float64 {
-	if len(data) == 0 {
-		return 0
-	}
-	index := int((percentile / 100) * float64(len(data)-1))
-	return data[index]
-}
-
-func BenchmarkOrderbook(b *testing.B) {
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			benchmarkOrderbookLimitCreate(30*time.Second, b)
-		}
-	})
-}
-
-func benchmarkOrderbookLimitCreate(duration time.Duration, b *testing.B) {
-	tok := uint64(1)
-	on := &EmptyNotification{}
-	ob := NewOrderBook(on)
-
-	orders := make([]Order, 1000_000)
-	for i := 0; i < 1000_000; i++ {
-		side := Buy
-		class := Limit
-		if rand.Intn(10) < 5 {
-			side = Sell
-		}
-		if rand.Intn(10) < 7 {
-			class = Market
-		}
-
-		orders[i] = Order{
-			ID:        uint64(i),
-			Class:     class,
-			Side:      side,
-			Flag:      None,
-			Qty:       decimal.NewI(uint64(rand.Intn(1000)), 0),
-			Price:     decimal.NewI(uint64(rand.Intn(100000)), uint(rand.Intn(3))),
-			TrigPrice: decimal.Zero,
-		}
-	}
-
-	b.ReportAllocs()
-
-	var latencies []float64
-
-	stopwatch := time.Now()
-	endTime := stopwatch.Add(duration)
-
-	b.ResetTimer()
-
-	for time.Now().Before(endTime) {
-		start := time.Now()
-
-		order := orders[rand.Intn(999_999)]
-		ob.AddOrder(tok, uint64(tok), order.Class, order.Side, order.Price, order.Qty, order.TrigPrice, order.Flag)
-
-		elapsed := time.Since(start).Nanoseconds()
-		latencies = append(latencies, float64(elapsed))
-
-		tok++
-	}
-
-	b.StopTimer()
-
-	printResultsWithPercentiles(b, "Add Order Latencies", latencies)
 }
 
 func getOrderBook() *OrderBook {
