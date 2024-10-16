@@ -71,12 +71,14 @@ jobs:
         run: |
           go test -v -bench . -benchmem -run=^$ ./... > benchmarks/main_benchmark.txt
 
-      - name: Compare benchmarks
+      - name: Process benchmark results
         run: |
-          echo "PR Benchmarks:" >> benchmarks/comparison.txt
-          cat benchmarks/pr_benchmark.txt >> benchmarks/comparison.txt
-          echo "\n\nMain Benchmarks:" >> benchmarks/comparison.txt
-          cat benchmarks/main_benchmark.txt >> benchmarks/comparison.txt
+          {
+            echo "PR Benchmarks:"
+            cat benchmarks/pr_benchmark.txt
+            echo $'\n\nMain Benchmarks:'
+            cat benchmarks/main_benchmark.txt
+          } > benchmarks/full_comparison.txt
 
       - name: Store benchmark result
         uses: actions/upload-artifact@v3
