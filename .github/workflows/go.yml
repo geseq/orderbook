@@ -78,7 +78,7 @@ jobs:
             cat benchmarks/pr_benchmark.txt
             echo $'\n\nMain Benchmarks:'
             cat benchmarks/main_benchmark.txt
-          } > benchmarks/full_comparison.txt
+          } > benchmarks/comparison.txt
 
       - name: Store benchmark result
         uses: actions/upload-artifact@v3
