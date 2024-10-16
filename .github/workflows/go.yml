@@ -59,7 +59,7 @@ jobs:
       - name: Run PR benchmarks
         run: |
           mkdir -p benchmarks
-          go test -bench . -benchmem -run=^$ ./... > benchmarks/pr_benchmark.txt
+          go test -v -bench . -benchmem -run=^$ ./... > benchmarks/pr_benchmark.txt
 
       - name: Checkout main
         uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
 
       - name: Run main benchmarks
         run: |
-          go test -bench . -benchmem -run=^$ ./... > benchmarks/main_benchmark.txt
+          go test -v -bench . -benchmem -run=^$ ./... > benchmarks/main_benchmark.txt
 
       - name: Compare benchmarks
         run: |
