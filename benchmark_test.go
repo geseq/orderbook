@@ -48,6 +48,35 @@ func runBenchmarkLatency(b *testing.B, duration time.Duration, lowerBound, upper
 
 	iterations := uint64(duration.Seconds()) * 2_000_000 // to avoid making clock calls in a loop, assuming roughly 500 nanos per iteration (4 operations)
 
+	warmup := uint64(2_000_000)
+	for i := uint64(0); i < warmup; i++ {
+		// Each iteration is 4 operations: 2 cancels and 2 adds
+		var r = rand.Intn(10)
+		dec := r < 5
+
+		bid, ask = getPrice(bid, ask, minSpread, dec)
+		if bid.LessThan(lowerBound) {
+			bid, ask = getPrice(bid, ask, minSpread, false)
+		} else if bid.GreaterThan(upperBound) {
+			bid, ask = getPrice(bid, ask, minSpread, true)
+		}
+
+		tok++
+		ob.CancelOrder(tok, buyID)
+
+		tok++
+		ob.CancelOrder(tok, sellID)
+
+		tok++
+		buyID = tok
+		tok++
+		sellID = tok
+
+		ob.AddOrder(buyID, buyID, Limit, Buy, bidQty, bid, decimal.Zero, None)
+
+		ob.AddOrder(sellID, sellID, Limit, Sell, askQty, ask, decimal.Zero, None)
+	}
+
 	loopStart := hrtime.TSC()
 	for i := uint64(0); i < iterations; i++ {
 		// Each iteration is 4 operations: 2 cancels and 2 adds
