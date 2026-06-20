@@ -1,0 +1,171 @@
+# Matching Engine Benchmark Challenge
+#
+# Runs THIS engine (github.com/geseq/orderbook) through the external
+# matching-engine benchmark harness and gates CI on CORRECTNESS only.
+#
+#   Benchmark:  flash1-dev/matching-engine-benchmark
+#   Pinned SHA: 77697a115e76a25a1e2aa886f555d55b87fcf052 (MIT licensed)
+#
+# Notes:
+#   * CORRECTNESS is the gate: every scenario's report stream is SHA-256'd by
+#     the harness and compared against reference/correctness_hash.txt. If any
+#     scenario's `correctness.status` != "PASS" the job fails.
+#   * THROUGHPUT is INFORMATIONAL ONLY and non-gating. GitHub-hosted runners
+#     are shared, virtualized, and NOT perf-calibrated, so the numbers are
+#     noisy and not comparable to the paper's figures.
+#   * The anti-cheat STATE AUDIT (which replays through a Liquibook baseline) is
+#     intentionally SKIPPED: building Liquibook is out of scope here. We drive
+#     the `harness` binary directly per scenario in --mode perf, which still
+#     computes and compares the correctness hash. (run_challenge.py always adds
+#     an audit run, so we do not use it.)
+#   * The geseq price-cross fix (issue #25) is already merged into this repo.
+#     The adapter's build.sh applies that same one-line patch to pricelevel.go,
+#     but its python patcher is idempotent: it detects the already-applied
+#     marker and exits 0. We additionally build against a COPY of our source in
+#     a temp dir so the workspace is never dirtied regardless.
+
+name: Matching Engine Benchmark Challenge
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Nightly at 04:00 UTC. Perf numbers are informational; this just keeps
+    # correctness honest against the pinned benchmark.
+    - cron: "0 4 * * *"
+  pull_request:
+    branches: [main]
+    paths:
+      # Core matching code — the engine under test.
+      - "orderbook.go"
+      - "pricelevel.go"
+      - "orderqueue.go"
+      - "order.go"
+      - "trigqueue.go"
+      - "pkg/tree/**"
+      - "pkg/pool/**"
+      - "go.mod"
+      - "go.sum"
+      # The workflow itself, so the introducing PR runs it.
+      - ".github/workflows/benchmark-challenge.yml"
+
+# Pinned benchmark revision and the Go toolchain the adapter's go.mod requires.
+env:
+  BENCH_SHA: 77697a115e76a25a1e2aa886f555d55b87fcf052
+  BENCH_URL: https://github.com/flash1-dev/matching-engine-benchmark.git
+
+jobs:
+  challenge:
+    name: Correctness gate (throughput informational)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout engine under test
+        uses: actions/checkout@v4
+
+      - name: Set up Go (adapter requires go 1.23)
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23.x"
+
+      - name: Install C++ toolchain and Boost
+        run: |
+          sudo apt-get update
+          # CMakeLists needs C++20 (GCC 14+) + Boost headers (header-only
+          # boost::lockfree::spsc_queue). cmake is already on ubuntu-24.04 but
+          # we install it explicitly for robustness.
+          sudo apt-get install -y --no-install-recommends \
+            g++-14 cmake libboost-all-dev
+
+      - name: Clone benchmark at pinned SHA
+        run: |
+          git clone --quiet "$BENCH_URL" bench
+          git -C bench checkout --quiet "$BENCH_SHA"
+          echo "Benchmark at: $(git -C bench rev-parse HEAD)"
+
+      - name: Build harness + generator (forcing g++-14 for C++20)
+        working-directory: bench
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14
+          cmake --build build -j
+          test -x ./harness
+          test -x ./generator
+
+      - name: Build geseq adapter against our checked-out source
+        working-directory: bench
+        env:
+          # Build against a COPY of our source so build.sh's in-place
+          # pricelevel.go patch (a no-op here — issue #25 is already merged and
+          # the idempotency marker is present) can never dirty the workspace.
+          ME_GESEQ_SRC: ${{ runner.temp }}/geseq_src
+        run: |
+          rm -rf "$ME_GESEQ_SRC"
+          cp -a "$GITHUB_WORKSPACE" "$ME_GESEQ_SRC"
+          # Drop the copied .git and the cloned benchmark to keep the temp
+          # source tree clean (cp -a of the workspace would include bench/).
+          rm -rf "$ME_GESEQ_SRC/.git" "$ME_GESEQ_SRC/bench"
+          bash additional_references/geseq_adapter/build.sh
+          test -f ./geseq_adapter.so
+
+      - name: Run all scenarios in perf mode and gate on correctness
+        working-directory: bench
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          SCENARIOS="static normal swing-25 swing-40 flash-crash"
+          fail=0
+          for s in $SCENARIOS; do
+            echo "::group::Scenario $s"
+            # Drive the harness directly in perf mode. It exits non-zero when
+            # the run is not VALID (e.g. core pinning fails on a shared runner);
+            # we do NOT gate on that exit code — correctness is read from JSON.
+            ./harness --engine ./geseq_adapter.so \
+                      --scenario "$s" --mode perf \
+                      --matcher-core 2 --drainer-core 3 || true
+            echo "::endgroup::"
+          done
+
+          echo "## Matching Engine Benchmark Challenge" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Benchmark pinned at \`$BENCH_SHA\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Throughput is **informational only** — GitHub-hosted runners are not perf-calibrated; numbers are noisy and non-gating. The anti-cheat state audit (Liquibook) is intentionally skipped." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Scenario | Correctness (gating) | Throughput (M msgs/s, informational) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|----------|----------------------|--------------------------------------|" >> "$GITHUB_STEP_SUMMARY"
+
+          for s in $SCENARIOS; do
+            # Most recent perf result JSON for this scenario.
+            f="$(ls -t results/geseq_${s}_perf_*.json 2>/dev/null | head -1 || true)"
+            if [ -z "$f" ]; then
+              echo "| $s | MISSING (no result JSON) | n/a |" >> "$GITHUB_STEP_SUMMARY"
+              fail=1
+              continue
+            fi
+            status="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['correctness']['status'])" "$f")"
+            tput="$(python3 -c "import json,sys; t=json.load(open(sys.argv[1]))['throughput_msgs_per_s']; print('%.2f' % (t/1e6))" "$f")"
+            echo "| $s | $status | $tput |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" != "PASS" ]; then
+              echo "Correctness FAILED for scenario '$s': status=$status" >&2
+              fail=1
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Result: FAILED — one or more scenarios did not pass correctness.**" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Result: PASSED — all scenarios match the correctness reference.**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload result JSON artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: bench/results/*.json
+          if-no-files-found: warn
