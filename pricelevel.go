@@ -238,7 +238,7 @@ func (pl *priceLevel) processLimitOrder(ob *OrderBook, compare func(price decima
 	orderQueue = pl.GetQueue()
 	qtyLeft := qty
 	qtyProcessed = decimal.Zero
-	for orderQueue := pl.GetQueue(); qtyLeft.GreaterThan(decimal.Zero) && orderQueue != nil; orderQueue = pl.GetQueue() {
+	for orderQueue := pl.GetQueue(); qtyLeft.GreaterThan(decimal.Zero) && orderQueue != nil && compare(orderQueue.Price()); orderQueue = pl.GetQueue() {
 		_, q := orderQueue.process(ob, takerOrderID, qtyLeft)
 		qtyLeft = qtyLeft.Sub(q)
 		qtyProcessed = qtyProcessed.Add(q)

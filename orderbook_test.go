@@ -269,6 +269,36 @@ func TestLimitOrder_CreateSell(t *testing.T) {
 	})
 }
 
+func TestLimitOrder_SellDoesNotCrossPriceLimit(t *testing.T) {
+	n, ob := getTestOrderBook()
+	n.Reset()
+
+	// Rest two bids at different prices.
+	processLine(ob, "1	L	B	2	9296	0	N")
+	processLine(ob, "2	L	B	2	9274	0	N")
+
+	// Send a sell limit priced between the two bids, with enough quantity to
+	// fully clear the top (9296) level and leftover that would spill into 9274
+	// if the cross-price predicate were not enforced.
+	processLine(ob, "3	L	S	5	9286	0	N")
+
+	require.NoError(t, getError(n.n))
+
+	// Only the 9296 bid should fill; the 9274 bid must remain untouched.
+	n.Verify(t, []string{
+		"CreateOrder Accepted 1 2",
+		"CreateOrder Accepted 2 2",
+		"CreateOrder Accepted 3 5",
+		"1 3 FilledComplete FilledPartial 2 9296",
+	})
+
+	// The 9274 bid must still be resting at full quantity.
+	restingBid := ob.Order(2)
+	require.NotNil(t, restingBid, "Expected the 9274 bid to still be resting")
+	assert.Equal(t, decimal.New(9274, 0), restingBid.Price)
+	assert.Equal(t, decimal.New(2, 0), restingBid.Qty)
+}
+
 func TestLimitOrder_ClearSellBestPriceFirst(t *testing.T) {
 	n, ob := getTestOrderBook()
 	addDepth(ob, 0)
