@@ -181,6 +181,83 @@ func runBenchmarkThroughput(b *testing.B, duration time.Duration, lowerBound, up
 	return throughput, avgLatency
 }
 
+// deepWindow is the number of live resting orders maintained by the deep-book
+// benchmarks (analog of the C++ -depth 50000 workload).
+const deepWindow = 50000
+
+// BenchmarkThroughputDeep measures add/cancel throughput while maintaining a
+// sliding window of ~deepWindow live resting orders with monotonically climbing
+// ids. Each iteration adds one non-crossing resting order (price spread across
+// the band) and, once the live count exceeds the window, cancels the oldest
+// still-live id. This exercises the order-id index at a realistic depth.
+func BenchmarkThroughputDeep(b *testing.B) {
+	b.ResetTimer()
+	throughput, avgLatency := runBenchmarkThroughputDeep(b, duration, lowerBound, upperBound, minSpread)
+	b.StopTimer()
+
+	b.ReportMetric(throughput, "ops/sec")
+	b.ReportMetric(avgLatency, "ns/op")
+}
+
+func runBenchmarkThroughputDeep(b *testing.B, duration time.Duration, lowerBound, upperBound, minSpread decimal.Decimal) (float64, float64) {
+	ob := getOrderBook()
+
+	// Split the band around the mid so buys rest below and sells rest above,
+	// guaranteeing resting (non-crossing) orders. Prices are spread across the
+	// band by stepping minSpread within each half.
+	mid := lowerBound.Add(upperBound).Div(decimal.NewI(2, 0))
+	qty := decimal.NewI(10, 0)
+	bandSteps := int64(upperBound.Sub(lowerBound).Div(minSpread).Float() / 2)
+	if bandSteps < 1 {
+		bandSteps = 1
+	}
+
+	priceFor := func(i uint64) (decimal.Decimal, SideType) {
+		step := decimal.NewI((i%uint64(bandSteps))+1, 0).Mul(minSpread)
+		if i&1 == 0 {
+			// Buy resting below mid.
+			return mid.Sub(step), Buy
+		}
+		// Sell resting above mid.
+		return mid.Add(step), Sell
+	}
+
+	b.ReportAllocs()
+
+	var tok, id uint64
+	// oldest is the smallest id still potentially live; cancel walks forward.
+	var oldest uint64 = 1
+
+	// Pre-fill the window so we measure steady-state add+cancel.
+	for live := 0; live < deepWindow; live++ {
+		id++
+		tok++
+		price, side := priceFor(id)
+		ob.AddOrder(tok, id, Limit, side, qty, price, decimal.Zero, None)
+	}
+
+	iterations := uint64(duration.Seconds()) * 2_000_000
+
+	start := hrtime.TSC()
+	for i := uint64(0); i < iterations; i++ {
+		id++
+		tok++
+		price, side := priceFor(id)
+		ob.AddOrder(tok, id, Limit, side, qty, price, decimal.Zero, None)
+
+		tok++
+		ob.CancelOrder(tok, oldest)
+		oldest++
+	}
+
+	operations := iterations * 2
+	elapsed := hrtime.TSCSince(start).ApproxDuration()
+	throughput := float64(operations) / elapsed.Seconds()
+	avgLatency := float64(elapsed.Nanoseconds()) / float64(operations)
+
+	return throughput, avgLatency
+}
+
 func printResultsWithPercentiles(b *testing.B, operationName string, hist *stats.Histogram) {
 	percentiles := []float64{50, 75, 90, 95, 99, 99.9, 99.99, 99.9999, 100}
 	b.Logf("Operation: %s", operationName)
