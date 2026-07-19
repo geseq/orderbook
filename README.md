@@ -54,7 +54,7 @@ against `fifo-limit-v1`; that profile does not claim market, IOC, FOK, trigger,
 AoN, or self-trade-prevention semantics.
 
 ```bash
-python -m pip install tracebook-sim==0.4.1
+python -m pip install tracebook-sim==0.5.0
 go build -o ./tracebook-adapter ./cmd/tracebook-adapter
 
 tracebook-conformance qualify \
