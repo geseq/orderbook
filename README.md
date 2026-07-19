@@ -20,15 +20,56 @@ Add/Cancel latency is pretty good (see below) and the jitter is not too bad. The
 - [x] Simple API
 - [x] Standard price-time priority
 - [x] Market and limit orders
-- [x] Order cancellation. (No in-book updates. Updates will have to be handled with Cancel+Create, and all that entails)
+- [x] Order cancellation and amendment. Same-price quantity reductions keep FIFO priority; increases and repricing lose it.
 - [x] Stop loss / take profit orders (limit and market)
 - [x] AoN, IoC, FoK, etc. Probably not trailing stops. They're probably better handled outside the order book.
-- [ ] Snapshot the ordebook state for recovery
+- [x] Detached FIFO-ordered snapshots for observation and recovery tooling
 - [x] Handle any GC latency shenanigans
 - [ ] Extensive tests and benchmarks
 - [ ] Add metrics counters
 - [ ] Improve consistent latency
 - [x] Extremely high throughput (see below)
+
+## Amendments and snapshots
+
+`AmendOrder` keeps FIFO priority only when quantity is reduced at the existing
+price. Increasing quantity or changing price removes and re-enters the order at
+the back of its new queue. Invalid amendments leave the original order intact.
+
+```go
+book.AmendOrder(token, orderID, newQuantity, newPrice)
+snapshot := book.Snapshot()
+```
+
+`Snapshot` is read-only and does not consume a sequencing token. It returns
+detached bid and ask slices in matching-consumption order: best price first,
+then FIFO within each price.
+
+## Tracebook conformance
+
+The optional [`cmd/tracebook-adapter`](cmd/tracebook-adapter) command exposes
+the engine over Tracebook's language-neutral NDJSON protocol. The checked-in CI
+job installs the public `tracebook-sim` package and qualifies the adapter only
+against `fifo-limit-v1`; that profile does not claim market, IOC, FOK, trigger,
+AoN, or self-trade-prevention semantics.
+
+```bash
+python -m pip install tracebook-sim==0.4.1
+go build -o ./tracebook-adapter ./cmd/tracebook-adapter
+
+tracebook-conformance qualify \
+  --profile fifo-limit-v1 \
+  --seed 42 \
+  --traces 25 \
+  --events-per-trace 200 \
+  --candidate-cmd ./tracebook-adapter \
+  --output-dir .tracebook/qualification
+```
+
+The adapter scales quantities internally so the engine's 8-decimal fixed-point
+type exactly represents the profile's default 12-decimal quantity grid for the
+qualified workload. Qualification is bounded evidence for that named profile,
+seed, and workload, not general exchange certification.
 
 
 ## Latency
@@ -85,5 +126,3 @@ That said, it should be extremely simple to use this. Create an `OrderBook` obje
 ## There's a bug
 
 Please create an issue. Also PRs are welcome!
-
-

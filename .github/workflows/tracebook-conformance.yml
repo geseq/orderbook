@@ -1,0 +1,55 @@
+name: Tracebook Conformance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "*.go"
+      - "pkg/**"
+      - "cmd/tracebook-adapter/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/tracebook-conformance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fifo-limit-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install public Tracebook package
+        run: python -m pip install tracebook-sim==0.4.1
+
+      - name: Build adapter
+        run: go build -ldflags="-X main.engineVersion=${GITHUB_SHA}" -o ./tracebook-adapter ./cmd/tracebook-adapter
+
+      - name: Qualify fifo-limit-v1
+        run: |
+          tracebook-conformance qualify \
+            --profile fifo-limit-v1 \
+            --seed 42 \
+            --traces 25 \
+            --events-per-trace 200 \
+            --candidate-cmd ./tracebook-adapter \
+            --output-dir .tracebook/qualification
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracebook-fifo-limit-v1
+          path: .tracebook/qualification
+          if-no-files-found: ignore
