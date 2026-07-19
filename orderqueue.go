@@ -90,13 +90,14 @@ func (oq *orderQueue) Remove(o *Order) *Order {
 	return o
 }
 
-func (oq *orderQueue) process(ob *OrderBook, takerOrderID uint64, qty decimal.Decimal) (ordersClosed int, qtyProcessed decimal.Decimal) {
+func (oq *orderQueue) process(ob *OrderBook, pl *priceLevel, takerOrderID uint64, qty decimal.Decimal) (ordersClosed int, qtyProcessed decimal.Decimal) {
 	for ho := oq.head; ho != nil && qty.GreaterThan(decimal.Zero); ho = oq.head {
 		switch qty.Cmp(ho.Qty) {
 		case -1:
 			qtyProcessed = qtyProcessed.Add(qty)
 			ho.Qty = ho.Qty.Sub(qty)
 			oq.totalQty = oq.totalQty.Sub(qty)
+			pl.volume = pl.volume.Sub(qty)
 			ob.notification.PutTrade(ho.ID, takerOrderID, FilledPartial, FilledComplete, qty, ho.Price)
 			ob.lastPrice = ho.Price
 			return

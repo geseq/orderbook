@@ -95,6 +95,15 @@ func (pl *priceLevel) Remove(o *Order) *Order {
 	return o
 }
 
+// reduceQuantity updates an order and both aggregate quantities in place.
+// The caller must ensure quantity is no greater than the current quantity.
+func (pl *priceLevel) reduceQuantity(o *Order, quantity decimal.Decimal) {
+	reduction := o.Qty.Sub(quantity)
+	o.Qty = quantity
+	o.queue.totalQty = o.queue.totalQty.Sub(reduction)
+	pl.volume = pl.volume.Sub(reduction)
+}
+
 // MaxPriceQueue returns maximal level of price
 func (pl *priceLevel) MaxPriceQueue() *orderQueue {
 	if pl.depth > 0 {
@@ -200,7 +209,7 @@ func (pl *priceLevel) processMarketOrder(ob *OrderBook, takerOrderID uint64, qty
 	qtyLeft := qty
 	qtyProcessed = decimal.Zero
 	for orderQueue := pl.GetQueue(); qtyLeft.GreaterThan(decimal.Zero) && orderQueue != nil; orderQueue = pl.GetQueue() {
-		_, q := orderQueue.process(ob, takerOrderID, qtyLeft)
+		_, q := orderQueue.process(ob, pl, takerOrderID, qtyLeft)
 		qtyLeft = qtyLeft.Sub(q)
 		qtyProcessed = qtyProcessed.Add(q)
 	}
@@ -239,7 +248,7 @@ func (pl *priceLevel) processLimitOrder(ob *OrderBook, compare func(price decima
 	qtyLeft := qty
 	qtyProcessed = decimal.Zero
 	for orderQueue := pl.GetQueue(); qtyLeft.GreaterThan(decimal.Zero) && orderQueue != nil && compare(orderQueue.Price()); orderQueue = pl.GetQueue() {
-		_, q := orderQueue.process(ob, takerOrderID, qtyLeft)
+		_, q := orderQueue.process(ob, pl, takerOrderID, qtyLeft)
 		qtyLeft = qtyLeft.Sub(q)
 		qtyProcessed = qtyProcessed.Add(q)
 	}
