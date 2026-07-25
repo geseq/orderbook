@@ -20,8 +20,8 @@ var oqPool = pool.NewItemPoolV2[orderQueue](1)
 type OrderBook struct {
 	asks         *priceLevel
 	bids         *priceLevel
-	triggerUnder *priceLevel                      // orders triggering under last price i.e. Stop Sell or Take Buy
-	triggerOver  *priceLevel                      // orders that trigger over last price i.e. Stop Buy or Take Sell
+	triggerUnder *priceLevel // orders triggering under last price i.e. Stop Sell or Take Buy
+	triggerOver  *priceLevel // orders that trigger over last price i.e. Stop Buy or Take Sell
 	orders       *orderIndex // orderId -> *Order
 	trigOrders   *orderIndex // orderId -> *Order
 	trigQueue    *triggerQueue
@@ -299,6 +299,66 @@ func (ob *OrderBook) CancelOrder(tok, orderID uint64) {
 	o.Release()
 }
 
+// AmendOrder changes the quantity or price of an active resting order.
+// A same-price quantity reduction preserves FIFO priority. Increasing quantity
+// or changing price removes and re-enters the order, so it loses priority and
+// may match immediately. Invalid amendments leave the original order intact.
+func (ob *OrderBook) AmendOrder(tok, orderID uint64, quantity, price decimal.Decimal) {
+	if !atomic.CompareAndSwapUint64(&ob.lastToken, tok-1, tok) {
+		panic("invalid token received: cannot maintain determinism")
+	}
+
+	o, ok := ob.orders.get(orderID)
+	if !ok {
+		ob.notification.PutOrder(MsgAmendOrder, Rejected, orderID, decimal.Zero, ErrOrderNotExists)
+		return
+	}
+	if quantity.IsZero() {
+		ob.notification.PutOrder(MsgAmendOrder, Rejected, orderID, quantity, ErrInvalidQuantity)
+		return
+	}
+	if price.IsZero() {
+		ob.notification.PutOrder(MsgAmendOrder, Rejected, orderID, quantity, ErrInvalidPrice)
+		return
+	}
+	if !ob.matching && ob.crossesBook(o.Side, price) {
+		ob.notification.PutOrder(MsgAmendOrder, Rejected, orderID, quantity, ErrNoMatching)
+		return
+	}
+
+	if price.Equal(o.Price) && quantity.LessThanOrEqual(o.Qty) {
+		if o.Side == Buy {
+			ob.bids.reduceQuantity(o, quantity)
+		} else {
+			ob.asks.reduceQuantity(o, quantity)
+		}
+		ob.notification.PutOrder(MsgAmendOrder, Accepted, orderID, quantity, nil)
+		return
+	}
+
+	class, side, flag := o.Class, o.Side, o.Flag
+	ob.orders.remove(orderID)
+	if side == Buy {
+		ob.bids.Remove(o)
+	} else {
+		ob.asks.Remove(o)
+	}
+	o.Release()
+
+	ob.notification.PutOrder(MsgAmendOrder, Accepted, orderID, quantity, nil)
+	ob.processOrder(orderID, class, side, quantity, price, flag)
+}
+
+func (ob *OrderBook) crossesBook(side SideType, price decimal.Decimal) bool {
+	if side == Buy {
+		q := ob.asks.GetQueue()
+		return q != nil && q.Price().LessThanOrEqual(price)
+	}
+
+	q := ob.bids.GetQueue()
+	return q != nil && q.Price().GreaterThanOrEqual(price)
+}
+
 // CancelOrder removes order with given ID from the order book
 func (ob *OrderBook) cancelOrder(orderID uint64) *Order {
 	o, ok := ob.orders.get(orderID)
@@ -397,4 +457,31 @@ func (ob *OrderBook) Bid(tok uint64) *Order {
 	}
 
 	return orderQueue.Head()
+}
+
+// Snapshot returns detached resting orders in matching-consumption order.
+// Reading a snapshot does not consume a sequencing token.
+func (ob *OrderBook) Snapshot() BookSnapshot {
+	return BookSnapshot{
+		Bids: snapshotSide(ob.bids),
+		Asks: snapshotSide(ob.asks),
+	}
+}
+
+func snapshotSide(level *priceLevel) []RestingOrder {
+	orders := make([]RestingOrder, 0, level.Len())
+	for queue := level.GetQueue(); queue != nil; queue = level.GetNextQueue(queue.Price()) {
+		for order := queue.Head(); order != nil; order = order.next {
+			orders = append(orders, RestingOrder{
+				ID:        order.ID,
+				Class:     order.Class,
+				Side:      order.Side,
+				Flag:      order.Flag,
+				Qty:       order.Qty,
+				Price:     order.Price,
+				TrigPrice: order.TrigPrice,
+			})
+		}
+	}
+	return orders
 }

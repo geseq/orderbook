@@ -42,6 +42,25 @@ type Trade struct {
 	Price        decimal.Decimal `json:"price" `
 }
 
+// RestingOrder is a detached copy of an order resting in the book.
+type RestingOrder struct {
+	ID        uint64
+	Class     ClassType
+	Side      SideType
+	Flag      FlagType
+	Qty       decimal.Decimal
+	Price     decimal.Decimal
+	TrigPrice decimal.Decimal
+}
+
+// BookSnapshot contains resting bids and asks in matching-consumption order.
+// Bids are ordered from highest to lowest price and asks from lowest to highest
+// price. Orders at the same price retain FIFO order.
+type BookSnapshot struct {
+	Bids []RestingOrder
+	Asks []RestingOrder
+}
+
 func (t Trade) String() string {
 	return fmt.Sprintf("%d %d %s %s %s %s", t.MakerOrderID, t.TakerOrderID, t.MakerStatus, t.TakerStatus, t.Qty.String(), t.Price.String())
 }
